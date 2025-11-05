@@ -2,19 +2,37 @@
 
 import { Ionicons } from "@expo/vector-icons"; // Untuk ikon
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as React from "react";
 
 // Import Layar
+import EditProfileScreen from "./screens/EditProfileScreen";
 import NotesScreen from "./screens/NotesScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import TodoListScreen from "./screens/TodoListScreen";
 
 const Tab = createBottomTabNavigator();
+const ProfileStack = createNativeStackNavigator();
+
+function ProfileStackScreen() {
+  return (
+    <ProfileStack.Navigator>
+      <ProfileStack.Screen
+        name="ProfileHome"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <ProfileStack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{ title: "Edit Profile" }}
+      />
+    </ProfileStack.Navigator>
+  );
+}
 
 export default function App() {
 	return (
-		// NavigationContainer adalah wadah untuk semua navigasi
-
 		<Tab.Navigator
 			initialRouteName="Todo" // Menentukan tab default saat aplikasi dimulai
 			screenOptions={({ route }) => ({
@@ -54,7 +72,7 @@ export default function App() {
 			/>
 			<Tab.Screen
 				name="Profile"
-				component={ProfileScreen}
+            component={ProfileStackScreen}
 				options={{ title: "Profil" }}
 			/>
 		</Tab.Navigator>

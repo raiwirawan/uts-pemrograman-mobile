@@ -1,6 +1,7 @@
 import React from 'react';
 import {
 	Alert,
+	Image,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -9,6 +10,9 @@ import {
 } from 'react-native';
 // Ikon Feather via Expo (preinstalled & typed)
 import { Feather as Icon } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+
+
 
 // Warna-warna utama dari desain
 const PRIMARY_COLOR = '#673AB7'; // Ungu untuk tombol dan aksen
@@ -40,13 +44,14 @@ const SettingItem: React.FC<SettingItemProps> = ({ iconName, title, trailingText
     <View style={styles.trailingContainer}>
       {trailingText && <Text style={styles.trailingText}>{trailingText}</Text>}
       {!isLogout && <Icon name="chevron-right" size={20} color="#BDBDBD" />}
-      {isLogout && <View style={{ width: 20 }} />} // Placeholder agar Log Out sejajar
+      {isLogout && <View style={{ width: 20 }} />} {/* Placeholder agar Log Out sejajar */}
     </View>
   </TouchableOpacity>
 );
 
 // --- MAIN COMPONENT ---
-const SettingsScreen = ({ navigation }: { navigation: any }) => {
+const SettingsScreen = () => {
+	
   
   const handleLogout = () => {
     Alert.alert(
@@ -69,6 +74,8 @@ const SettingsScreen = ({ navigation }: { navigation: any }) => {
     // Di sini Anda dapat menambahkan logika navigasi atau fungsi lainnya
   };
 
+  const navigation = useNavigation()
+
   return (
     <View style={styles.container}>
       {/* ScrollView agar konten bisa di-scroll jika panjang */}
@@ -76,7 +83,10 @@ const SettingsScreen = ({ navigation }: { navigation: any }) => {
         
         {/* === BAGIAN PROFIL PENGGUNA === */}
         <View style={styles.profileSection}>
-          <View style={styles.avatar} /> 
+          <Image
+            style={styles.avatar}
+            source={{ uri: 'https://i.pravatar.cc/128?img=12' }}
+          /> 
           <View>
             <Text style={styles.profileName}>Roberto Plerr</Text>
             <View style={styles.profileEmailContainer}>
@@ -89,7 +99,7 @@ const SettingsScreen = ({ navigation }: { navigation: any }) => {
         {/* === TOMBOL EDIT PROFIL === */}
         <TouchableOpacity 
           style={styles.editButton} 
-          onPress={() => handleAction('Edit Profile')}
+          onPress={() => navigation.navigate('EditProfile' as never)}
         >
           <Icon name="edit-3" size={20} color={PRIMARY_COLOR} />
           <Text style={styles.editButtonText}>Edit Profile</Text>
@@ -105,8 +115,8 @@ const SettingsScreen = ({ navigation }: { navigation: any }) => {
             title="Change Password"
             onPress={() => handleAction('Change Password')}
           />
+          {/* Ikon 'Aa' (text-fields) dari Feather */}
           <SettingItem
-            // Ikon 'Aa' (text-fields) dari Feather
             iconName="type" 
             title="Text Size"
             trailingText="Medium"

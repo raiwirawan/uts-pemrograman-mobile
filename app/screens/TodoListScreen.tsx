@@ -1,10 +1,16 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Alert } from "react-native";
+import FloatingActionButton from "@/components/notes/to-do/to-doButten";
 
 const TodoListScreen = () => {
+	const handleAddTodo = () => {
+    // Ganti Alert dengan navigasi atau modal untuk menambah To-Do
+    Alert.alert("Tombol FAB Ditekan", "Siap untuk menambahkan To-Do baru!");
+  };
 	return (
 		<View style={styles.container}>
 			<Text style={styles.text}>Halaman To-do List ✅</Text>
+			<FloatingActionButton onPress={handleAddTodo} />
 		</View>
 	);
 };

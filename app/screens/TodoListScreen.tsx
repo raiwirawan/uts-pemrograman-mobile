@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Alert } from "react-native";
-import FloatingActionButton from "@/components/notes/to-do/to-doButten";
+import FloatingActionButton from "@/components/to-do/to-doButten";
 
 const TodoListScreen = () => {
 	const handleAddTodo = () => {

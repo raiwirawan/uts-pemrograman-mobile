@@ -1,3 +1,4 @@
+import NotesButton from "@/components/notes/NotesButton";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -5,6 +6,7 @@ const NotesScreen = () => {
 	return (
 		<View style={styles.container}>
 			<Text style={styles.text}>Halaman Catatan 📝</Text>
+			<NotesButton buttonText="Tambah Catatan Baru" />
 		</View>
 	);
 };

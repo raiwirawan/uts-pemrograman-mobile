@@ -1,25 +1,20 @@
-import React from 'react';
-import {
-	Alert,
-	Image,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
-} from 'react-native';
-// Ikon Feather via Expo (preinstalled & typed)
 import { Feather as Icon } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import React from 'react';
+import {
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 
+const PRIMARY_COLOR = '#673AB7';
+const LOGOUT_COLOR = '#E53935';
+const GREY_TEXT = '#757575';
 
-
-// Warna-warna utama dari desain
-const PRIMARY_COLOR = '#673AB7'; // Ungu untuk tombol dan aksen
-const LOGOUT_COLOR = '#E53935';  // Merah
-const GREY_TEXT = '#757575';     // Abu-abu untuk detail
-
-// --- KOMPONEN ITEM PENGATURAN ---
 type SettingItemProps = {
   iconName: React.ComponentProps<typeof Icon>['name'];
   title: string;
@@ -34,7 +29,7 @@ const SettingItem: React.FC<SettingItemProps> = ({ iconName, title, trailingText
       <Icon
         name={iconName}
         size={20}
-        color={isLogout ? LOGOUT_COLOR : '#000'} // Warna ikon
+        color={isLogout ? LOGOUT_COLOR : '#000'}
         style={styles.listIcon}
       />
       <Text style={[styles.listItemTitle, isLogout && { color: LOGOUT_COLOR }]}>
@@ -44,23 +39,21 @@ const SettingItem: React.FC<SettingItemProps> = ({ iconName, title, trailingText
     <View style={styles.trailingContainer}>
       {trailingText && <Text style={styles.trailingText}>{trailingText}</Text>}
       {!isLogout && <Icon name="chevron-right" size={20} color="#BDBDBD" />}
-      {isLogout && <View style={{ width: 20 }} />} {/* Placeholder agar Log Out sejajar */}
+      {isLogout && <View style={{ width: 20 }} />}
     </View>
   </TouchableOpacity>
 );
 
-// --- MAIN COMPONENT ---
-const SettingsScreen = () => {
-	
-  
+function ProfileScreen(){
+  const navigation = useNavigation();
   const handleLogout = () => {
     Alert.alert(
       "Log Out",
       "Apakah Anda yakin ingin keluar?",
       [
         { text: "Batal", style: "cancel" },
-        { 
-          text: "Ya, Keluar", 
+        {
+          text: "Ya, Keluar",
           onPress: () => console.log("User Logged Out"),
           style: "destructive"
         }
@@ -69,24 +62,14 @@ const SettingsScreen = () => {
     );
   };
 
-  const handleAction = (actionName: string) => {
-    console.log(`Action: ${actionName}`);
-    // Di sini Anda dapat menambahkan logika navigasi atau fungsi lainnya
-  };
-
-  const navigation = useNavigation()
-
   return (
     <View style={styles.container}>
-      {/* ScrollView agar konten bisa di-scroll jika panjang */}
       <ScrollView contentContainerStyle={styles.contentPadding}>
-        
-        {/* === BAGIAN PROFIL PENGGUNA === */}
         <View style={styles.profileSection}>
           <Image
             style={styles.avatar}
             source={{ uri: 'https://i.pravatar.cc/128?img=12' }}
-          /> 
+          />
           <View>
             <Text style={styles.profileName}>Roberto Plerr</Text>
             <View style={styles.profileEmailContainer}>
@@ -96,9 +79,8 @@ const SettingsScreen = () => {
           </View>
         </View>
 
-        {/* === TOMBOL EDIT PROFIL === */}
-        <TouchableOpacity 
-          style={styles.editButton} 
+        <TouchableOpacity
+          style={styles.editButton}
           onPress={() => navigation.navigate('EditProfile' as never)}
         >
           <Icon name="edit-3" size={20} color={PRIMARY_COLOR} />
@@ -106,50 +88,41 @@ const SettingsScreen = () => {
         </TouchableOpacity>
 
         <View style={styles.sectionSpacer} />
-
-        {/* === APP SETTINGS === */}
         <Text style={styles.settingsHeader}>APP SETTINGS</Text>
+
         <View style={styles.listContainer}>
           <SettingItem
             iconName="lock"
             title="Change Password"
-            onPress={() => handleAction('Change Password')}
+            onPress={() => navigation.navigate('ChangePassword' as never)}
           />
-          {/* Ikon 'Aa' (text-fields) dari Feather */}
           <SettingItem
-            iconName="type" 
+            iconName="type"
             title="Text Size"
             trailingText="Medium"
-            onPress={() => handleAction('Text Size')}
+            onPress={() => {}}
           />
           <SettingItem
             iconName="bell"
             title="Notifications"
             trailingText="All active"
-            onPress={() => handleAction('Notifications')}
+            onPress={() => navigation.navigate('Notifications' as never)}
           />
-          {/* Divider/pemisah antara item sudah ada di style listItem */}
         </View>
 
         <View style={styles.sectionSpacer} />
-        
-        {/* === LOG OUT === */}
         <SettingItem
           iconName="log-out"
           title="Log Out"
           onPress={handleLogout}
           isLogout={true}
         />
-        
       </ScrollView>
-
-      {/* === VERSI APLIKASI DI BAWAH === */}
       <Text style={styles.versionText}>Makarya Notes v1.1</Text>
     </View>
   );
-};
+}
 
-// --- STYLESHEET ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -161,8 +134,6 @@ const styles = StyleSheet.create({
   sectionSpacer: {
     height: 30,
   },
-  
-  // Profil
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -174,7 +145,6 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     backgroundColor: '#E0E0E0',
     marginRight: 16,
-    // Gunakan Image component di sini untuk gambar profil
   },
   profileName: {
     fontSize: 18,
@@ -190,8 +160,6 @@ const styles = StyleSheet.create({
     color: GREY_TEXT,
     marginLeft: 4,
   },
-  
-  // Tombol Edit
   editButton: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -207,8 +175,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
-  
-  // Pengaturan
   settingsHeader: {
     color: GREY_TEXT,
     fontWeight: 'bold',
@@ -221,11 +187,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5', // Pemisah sangat tipis
+    borderBottomColor: '#F5F5F5',
   },
-  listContainer: {
-    // container untuk daftar item pengaturan
-  },
+  listContainer: {},
   listIconTextContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -235,7 +199,7 @@ const styles = StyleSheet.create({
   },
   listItemTitle: {
     fontSize: 16,
-    fontWeight: '500', // Setara dengan medium
+    fontWeight: '500',
   },
   trailingContainer: {
     flexDirection: 'row',
@@ -245,8 +209,6 @@ const styles = StyleSheet.create({
     color: GREY_TEXT,
     marginRight: 5,
   },
-
-  // Versi
   versionText: {
     textAlign: 'center',
     color: '#BDBDBD',
@@ -255,4 +217,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SettingsScreen;
+export default ProfileScreen;

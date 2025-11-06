@@ -1,20 +1,20 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+	Alert,
+	Image,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	TouchableOpacity,
+	View
 } from 'react-native';
 
 const PRIMARY_COLOR = '#673AB7';
 const GREY_TEXT = '#757575';
 
-const EditProfileScreen = ({ navigation }: { navigation: any }) => {
+function EditProfileScreen({ navigation }: { navigation: any }) {
 	const [fullName, setFullName] = useState('Roberto Plerr');
 	const [email, setEmail] = useState('roberto_plerr@gmail.com');
 
@@ -30,7 +30,6 @@ const EditProfileScreen = ({ navigation }: { navigation: any }) => {
 	return (
 		<View style={styles.container}>
 			<ScrollView contentContainerStyle={styles.contentPadding}>
-				{/* Avatar */}
 				<View style={styles.centered}>
 					<Image
 						style={styles.avatar}
@@ -43,8 +42,6 @@ const EditProfileScreen = ({ navigation }: { navigation: any }) => {
 				</View>
 
 				<View style={styles.divider} />
-
-				{/* Full Name */}
 				<Text style={styles.label}>Full Name</Text>
 				<TextInput
 					value={fullName}
@@ -54,7 +51,6 @@ const EditProfileScreen = ({ navigation }: { navigation: any }) => {
 					placeholderTextColor="#BDBDBD"
 				/>
 
-				{/* Email Address */}
 				<Text style={[styles.label, { marginTop: 16 }]}>Email Address</Text>
 				<TextInput
 					value={email}
@@ -65,12 +61,12 @@ const EditProfileScreen = ({ navigation }: { navigation: any }) => {
 					placeholder="Email Address"
 					placeholderTextColor="#BDBDBD"
 				/>
+
 				<Text style={styles.helperText}>
 					Changing email address information means you need to re-login to the apps.
 				</Text>
 			</ScrollView>
 
-			{/* Save button */}
 			<TouchableOpacity style={styles.saveBtn} onPress={onSave}>
 				<Feather name="check" size={18} color="#fff" />
 				<Text style={styles.saveBtnText}>Save Changes</Text>

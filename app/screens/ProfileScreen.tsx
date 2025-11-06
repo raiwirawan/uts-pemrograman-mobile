@@ -106,7 +106,7 @@ function ProfileScreen(){
             iconName="bell"
             title="Notifications"
             trailingText="All active"
-            onPress={() => navigation.navigate('Notifications' as never)}
+            onPress={() => navigation.navigate('Notification' as never)}
           />
         </View>
 

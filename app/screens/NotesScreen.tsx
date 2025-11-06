@@ -2,7 +2,7 @@ import NotesButton from "@/components/notes/NotesButton";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-const NotesScreen = () => {
+function NotesScreen(){
 	return (
 		<View style={styles.container}>
 			<Text style={styles.text}>Halaman Catatan 📝</Text>

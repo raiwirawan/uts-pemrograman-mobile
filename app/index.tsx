@@ -5,15 +5,17 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import * as React from "react";
 
 // Import Layar
+import { NavigationIndependentTree } from "@react-navigation/native";
+import TodoStack from "./screens/navigations/TodoStack";
 import NotesScreen from "./screens/NotesScreen";
 import ProfileScreen from "./screens/ProfileScreen";
-import TodoListScreen from "./screens/TodoListScreen";
 
 const Tab = createBottomTabNavigator();
 
 export default function App() {
 	return (
 		// NavigationContainer adalah wadah untuk semua navigasi
+		<NavigationIndependentTree>
 
 		<Tab.Navigator
 			initialRouteName="Todo" // Menentukan tab default saat aplikasi dimulai
@@ -49,7 +51,7 @@ export default function App() {
 			/>
 			<Tab.Screen
 				name="Todo"
-				component={TodoListScreen}
+				component={TodoStack}
 				options={{ title: "To-do List" }}
 			/>
 			<Tab.Screen
@@ -58,5 +60,6 @@ export default function App() {
 				options={{ title: "Profil" }}
 			/>
 		</Tab.Navigator>
+        </NavigationIndependentTree>
 	);
 }

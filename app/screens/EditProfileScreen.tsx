@@ -33,7 +33,7 @@ function EditProfileScreen({ navigation }: { navigation: any }) {
 				<View style={styles.centered}>
 					<Image
 						style={styles.avatar}
-						source={{ uri: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=300' }}
+						source={{ uri: 'https://i.pravatar.cc/128?img=12' }}
 					/>
 					<TouchableOpacity style={styles.changeImageBtn} onPress={onChangeImage}>
 						<Feather name="edit-3" size={16} color={PRIMARY_COLOR} />

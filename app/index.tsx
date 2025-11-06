@@ -14,7 +14,17 @@ export default function App() {
 			<Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
 			<Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: "Edit Profile" }} />
 			<Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: "Change Password" }} />
-			<Stack.Screen name="Notification" component={NotificationScreen} options={{ title: "Notifications" }} />
+			<Stack.Screen
+				name="Notification"
+				component={NotificationScreen}
+				options={{
+					title: "Notifications",
+					headerShown: false,
+					presentation: 'transparentModal',
+					animation: 'fade',
+					contentStyle: { backgroundColor: 'transparent' },
+				}}
+			/>
 		</Stack.Navigator>
 	);
 }

@@ -1,7 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { sendPasswordResetEmail } from "firebase/auth";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
 	Alert,
 	KeyboardAvoidingView,
@@ -13,38 +11,30 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import { auth } from "../../config/firebase"; // pastikan export auth
 
-type ForgotPasswordScreenProps = {
-	navigation: NativeStackNavigationProp<any>;
-};
+import Colors from "@/constants/colors";
+import { useAuth } from "@/hooks/useAuth";
+import { ForgotPasswordScreenProps } from "@/types/navigation";
 
-export default function ForgotPasswordScreen({
-	navigation,
-}: ForgotPasswordScreenProps) {
+function ForgotPasswordScreen({ navigation }: ForgotPasswordScreenProps) {
 	const [email, setEmail] = useState("");
+	const { resetPassword } = useAuth();
 
 	const handleSendReset = async () => {
 		if (!email) {
-			Alert.alert("Error", "Please enter your email address");
+			Alert.alert("Error", "Masukkan alamat email Anda");
 			return;
 		}
 
 		try {
-			await sendPasswordResetEmail(auth, email);
+			await resetPassword(email);
 			Alert.alert(
-				"Check your email",
-				`We have sent a password reset link to ${email}`,
+				"Cek email Anda",
+				`Link reset password telah dikirim ke ${email}`,
 				[{ text: "OK", onPress: () => navigation.goBack() }]
 			);
 		} catch (err: any) {
-			let message = "Failed to send reset email";
-			if (err.code === "auth/user-not-found") {
-				message = "No account found with this email";
-			} else if (err.code === "auth/invalid-email") {
-				message = "Please enter a valid email address";
-			}
-			Alert.alert("Error", message);
+			Alert.alert("Gagal", err.message);
 		}
 	};
 
@@ -58,40 +48,41 @@ export default function ForgotPasswordScreen({
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
 			>
-				{/* Back to Login – tanpa absolute */}
+				{/* Back to Login */}
 				<TouchableOpacity
 					onPress={() => navigation.goBack()}
 					style={styles.backBtn}
 				>
-					<Ionicons name="arrow-back" size={24} color="#6A1B9A" />
+					<Ionicons name="arrow-back" size={24} color={Colors.PRIMARY_PURPLE} />
 					<Text style={styles.backText}>Back to Login</Text>
 				</TouchableOpacity>
 
-				{/* Title */}
+				{/* Title & Subtitle */}
 				<Text style={styles.title}>Forgot Password</Text>
 				<Text style={styles.subtitle}>
-					Insert your email address to receive a code for creating a new
-					password
+					Masukkan alamat email Anda untuk menerima link reset password
 				</Text>
 
 				{/* Email */}
 				<Text style={styles.label}>Email Address</Text>
 				<TextInput
 					style={styles.input}
-					placeholder="anto_michael@gmail.com"
-					placeholderTextColor="#999"
+					placeholder="contoh: anto_michael@gmail.com"
+					placeholderTextColor={Colors.TEXT_LIGHT_GREY}
 					value={email}
 					onChangeText={setEmail}
 					keyboardType="email-address"
 					autoCapitalize="none"
+					autoCorrect={false}
 				/>
 
-				{/* Send Code Button */}
+				{/* Send Button – SAMA PERSIS LOGIN/REGISTER */}
 				<TouchableOpacity style={styles.sendBtn} onPress={handleSendReset}>
-					<Text style={styles.sendText}>Send Code</Text>
+					<Text style={styles.sendText}>Send Reset Link</Text>
+					<Ionicons name="arrow-forward" size={24} color={Colors.WHITE} />
 				</TouchableOpacity>
 
-				{/* Extra space bawah */}
+				{/* Extra space */}
 				<View style={{ height: 100 }} />
 			</ScrollView>
 		</KeyboardAvoidingView>
@@ -101,7 +92,7 @@ export default function ForgotPasswordScreen({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#fff",
+		backgroundColor: Colors.BACKGROUND,
 	},
 	scrollContent: {
 		flexGrow: 1,
@@ -115,7 +106,7 @@ const styles = StyleSheet.create({
 		alignSelf: "flex-start",
 	},
 	backText: {
-		color: "#6A1B9A",
+		color: Colors.PRIMARY_PURPLE,
 		fontSize: 16,
 		fontWeight: "600",
 		marginLeft: 8,
@@ -123,39 +114,43 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 32,
 		fontWeight: "bold",
-		color: "#4A148C",
+		color: Colors.DARK_PURPLE,
 		marginBottom: 8,
 	},
 	subtitle: {
 		fontSize: 16,
-		color: "#666",
+		color: Colors.TEXT_GREY,
 		marginBottom: 50,
-		lineHeight: 22,
+		lineHeight: 24,
 	},
 	label: {
 		fontSize: 16,
-		color: "#333",
+		color: Colors.TEXT_DARK,
 		marginBottom: 8,
 	},
 	input: {
 		borderWidth: 1,
-		borderColor: "#ddd",
+		borderColor: Colors.INPUT_BORDER,
 		borderRadius: 12,
 		padding: 16,
 		fontSize: 16,
-		backgroundColor: "#fafafa",
+		backgroundColor: Colors.INPUT_BG,
 		marginBottom: 40,
 	},
 	sendBtn: {
-		backgroundColor: "#6A1B9A",
-		paddingVertical: 18,
-		borderRadius: 30,
+		backgroundColor: Colors.PRIMARY_PURPLE,
+		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
+		paddingVertical: 18,
+		borderRadius: 30,
+		gap: 10,
 	},
 	sendText: {
-		color: "#fff",
+		color: Colors.WHITE,
 		fontSize: 18,
 		fontWeight: "600",
 	},
 });
+
+export default ForgotPasswordScreen;

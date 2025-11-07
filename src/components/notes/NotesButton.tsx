@@ -1,6 +1,6 @@
 import { Text, TouchableOpacity, View } from "react-native";
 
-export default function NotesButton({ buttonText }: { buttonText: string }) {
+function NotesButton({ buttonText }: { buttonText: string }) {
 	return (
 		<View>
 			<TouchableOpacity>
@@ -9,3 +9,5 @@ export default function NotesButton({ buttonText }: { buttonText: string }) {
 		</View>
 	);
 }
+
+export default NotesButton;

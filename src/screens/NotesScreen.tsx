@@ -1,4 +1,5 @@
 import { db } from "@/config/firebase";
+import { useAuth } from "@/hooks/useAuth";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -11,7 +12,7 @@ import {
 	query,
 	Timestamp,
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	ActivityIndicator,
 	FlatList,
@@ -36,7 +37,8 @@ interface Note {
 	updatedAt: Timestamp;
 }
 
-export default function NotesScreen() {
+function NotesScreen() {
+	const { user } = useAuth();
 	const navigation = useNavigation<NotesScreenNavigationProp>();
 	const [notes, setNotes] = useState<Note[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -221,3 +223,5 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 	},
 });
+
+export default NotesScreen;

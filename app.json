@@ -1,49 +1,113 @@
 {
-  "expo": {
-    "name": "uts-pemrograman-mobile",
-    "slug": "uts-pemrograman-mobile",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "utspemrogramanmobile",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
-      ],
-      "expo-web-browser"
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
-  }
+	"expo": {
+		"name": "NoteNote",
+		"description": "Aplikasi catatan dan to-do list sederhana dengan Firebase Auth & Firestore. Catat ide, wujudkan mimpi.",
+		"slug": "notenote",
+		"owner": "raiwirawan",
+		"currentFullName": "NoteNote",
+		"originalFullName": "NoteNote",
+		"runtimeVersion": {
+			"policy": "sdkVersion"
+		},
+		"version": "1.0.0",
+		"platforms": ["ios", "android", "web"],
+		"githubUrl": "https://github.com/raiwirawan/uts-pemrograman-mobile",
+		"orientation": "portrait",
+		"userInterfaceStyle": "light",
+		"backgroundColor": "#FFFFFF",
+		"primaryColor": "#6A1B9A",
+		"icon": "./assets/images/icon.png",
+
+		"notification": {
+			"icon": "./assets/images/notification-icon.png",
+			"color": "#6A1B9A",
+			"androidMode": "default"
+		},
+		"androidNavigationBar": {
+			"backgroundColor": "#FFFFFF",
+			"barStyle": "dark-content"
+		},
+
+		"developmentClient": {
+			"silentLaunch": true
+		},
+
+		"scheme": "notenote",
+		"updates": {
+			"fallbackToCacheTimeout": 0,
+			"enabled": true
+		},
+
+		"locales": {},
+
+		"plugins": [
+			"expo-router",
+			[
+				"expo-splash-screen",
+				{
+					"image": "./assets/images/splash-icon.png",
+					"imageWidth": 200,
+					"resizeMode": "contain",
+					"backgroundColor": "#FFFFFF",
+					"dark": {
+						"backgroundColor": "#000000"
+					}
+				}
+			],
+			"expo-web-browser",
+			"expo-font"
+		],
+
+		"splash": {
+			"image": "./assets/images/splash-icon.png",
+			"resizeMode": "contain",
+			"backgroundColor": "#FFFFFF",
+			"dark": {
+				"backgroundColor": "#000000"
+			}
+		},
+
+		"jsEngine": "hermes",
+		"newArchEnabled": true,
+		"buildCacheProvider": "eas",
+
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "com.notenotedev.notenote",
+			"buildNumber": "1",
+			"infoPlist": {
+				"UIBackgroundModes": ["fetch", "remote-notification"]
+			}
+		},
+
+		"android": {
+			"package": "com.notenotedev.notenote",
+			"versionCode": 1,
+			"adaptiveIcon": {
+				"foregroundImage": "./assets/images/android-icon-foreground.png",
+				"backgroundImage": "./assets/images/android-icon-background.png",
+				"monochromeImage": "./assets/images/android-icon-monochrome.png",
+				"backgroundColor": "#E6F4FE"
+			},
+			"edgeToEdgeEnabled": true,
+			"predictiveBackGestureEnabled": false,
+			"permissions": []
+		},
+
+		"web": {
+			"output": "static",
+			"favicon": "./assets/images/favicon.png",
+			"bundler": "webpack"
+		},
+
+		"experiments": {
+			"typedRoutes": true,
+			"reactCompiler": true
+		},
+
+		"_internal": {
+			"isDebug": false,
+			"projectRoot": "."
+		}
+	}
 }

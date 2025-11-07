@@ -6,7 +6,9 @@ import GuestRoute from "@/routes/GuestRoute";
 import ProtectedRoute from "@/routes/ProtectedRoute";
 
 import type {
+	AddNoteScreenProps,
 	ChangePasswordScreenProps,
+	EditNoteScreenProps,
 	EditProfileScreenProps,
 	ForgotPasswordScreenProps,
 	HomeScreenProps,
@@ -16,7 +18,9 @@ import type {
 	RegisterScreenProps,
 } from "@/types/navigation";
 
+import AddNoteScreen from "@/screens/AddNoteScreen";
 import ChangePasswordScreen from "@/screens/ChangePasswordScreen";
+import EditNoteScreen from "@/screens/EditNoteScreen";
 import EditProfileScreen from "@/screens/EditProfileScreen";
 import ForgotPasswordScreen from "@/screens/ForgotPasswordScreen";
 import HomeScreen from "@/screens/HomeScreen";
@@ -117,6 +121,22 @@ export default function App() {
 						{(props) => (
 							<ProtectedRoute>
 								<NotificationScreen {...(props as NotificationScreenProps)} />
+							</ProtectedRoute>
+						)}
+					</Stack.Screen>
+
+					<Stack.Screen name="AddNote" options={{ title: "Buat Catatan" }}>
+						{(props) => (
+							<ProtectedRoute>
+								<AddNoteScreen {...(props as AddNoteScreenProps)} />
+							</ProtectedRoute>
+						)}
+					</Stack.Screen>
+
+					<Stack.Screen name="EditNote" options={{ title: "Edit Catatan" }}>
+						{(props) => (
+							<ProtectedRoute>
+								<EditNoteScreen {...(props as EditNoteScreenProps)} />
 							</ProtectedRoute>
 						)}
 					</Stack.Screen>

@@ -19,7 +19,7 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 function HomeScreen({ navigation }: HomeScreenProps) {
 	return (
 		<Tab.Navigator
-			initialRouteName="Todo"
+			initialRouteName="Notes"
 			screenOptions={({ route }) => ({
 				tabBarIcon: ({ focused, color, size }) => {
 					let iconName: keyof typeof Ionicons.glyphMap = "help-outline";

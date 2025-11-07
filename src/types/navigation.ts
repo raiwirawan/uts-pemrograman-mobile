@@ -1,4 +1,5 @@
 // types/navigation.ts
+import { Note } from "@/lib/notes";
 import { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
@@ -12,6 +13,8 @@ export type RootStackParamList = {
 	EditProfile: undefined;
 	ChangePassword: undefined;
 	Notification: undefined;
+	AddNote: undefined;
+	EditNote: { note: Note };
 };
 
 // === TAB PARAM LIST (BARU!) ===
@@ -53,6 +56,14 @@ export type ChangePasswordScreenProps = NativeStackScreenProps<
 export type NotificationScreenProps = NativeStackScreenProps<
 	RootStackParamList,
 	"Notification"
+>;
+export type AddNoteScreenProps = NativeStackScreenProps<
+	RootStackParamList,
+	"AddNote"
+>;
+export type EditNoteScreenProps = NativeStackScreenProps<
+	RootStackParamList,
+	"EditNote"
 >;
 
 // === TAB SCREEN PROPS (BARU!) ===

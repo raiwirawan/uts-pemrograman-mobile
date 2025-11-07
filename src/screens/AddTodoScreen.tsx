@@ -24,6 +24,7 @@ const COLOR_OPTIONS = [
 	colors.CARD_PINK,
 ];
 
+// eslint-disable-next-line no-empty-pattern
 export default function AddTodoScreen({}: AddTodoScreenProps) {
 	const { user } = useAuth();
 	const navigation = useNavigation();
@@ -65,7 +66,10 @@ export default function AddTodoScreen({}: AddTodoScreenProps) {
 			await createTodo(user!.uid, title.trim(), items, selectedColor);
 			navigation.goBack();
 		} catch (error) {
-			Alert.alert("Error", "Gagal menyimpan todo");
+			Alert.alert(
+				"Error",
+				error instanceof Error ? error.message : "Gagal menyimpan todo"
+			);
 			setSaving(false);
 		}
 	};

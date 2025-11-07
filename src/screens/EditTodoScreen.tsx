@@ -25,6 +25,7 @@ const COLOR_OPTIONS = [
 	"#F8BBD0", // Light Pink
 ];
 
+// eslint-disable-next-line no-empty-pattern
 export default function EditTodoScreen({}: EditTodoScreenProps) {
 	const { user } = useAuth();
 	const navigation = useNavigation();
@@ -52,14 +53,17 @@ export default function EditTodoScreen({}: EditTodoScreenProps) {
 					navigation.goBack();
 				}
 			} catch (error) {
-				Alert.alert("Error", "Gagal memuat data");
+				Alert.alert(
+					"Error",
+					error instanceof Error ? error.message : "Gagal memuat data"
+				);
 				navigation.goBack();
 			} finally {
 				setLoading(false);
 			}
 		};
 		loadTodo();
-	}, [todoId, user]);
+	}, [todoId, user, navigation]);
 
 	const addItem = () => {
 		if (currentItem.trim()) {
@@ -102,7 +106,10 @@ export default function EditTodoScreen({}: EditTodoScreenProps) {
 			});
 			navigation.goBack();
 		} catch (error) {
-			Alert.alert("Error", "Gagal menyimpan perubahan");
+			Alert.alert(
+				"Error",
+				error instanceof Error ? error.message : "Gagal menyimpan perubahan"
+			);
 			setSaving(false);
 		}
 	};

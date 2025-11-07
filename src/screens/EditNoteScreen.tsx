@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { deleteNote, updateNote } from "@/lib/notes";
 import { EditNoteScreenProps } from "@/types/navigation";
 
+// eslint-disable-next-line no-empty-pattern
 export default function EditNoteScreen({}: EditNoteScreenProps) {
 	const route = useRoute<EditNoteScreenProps["route"]>();
 	const navigation = useNavigation<EditNoteScreenProps["navigation"]>();

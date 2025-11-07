@@ -47,7 +47,7 @@ export default function TodoListScreen() {
 
 	useEffect(() => {
 		loadTodos();
-	}, [user?.uid]);
+	}, [user?.uid, loadTodos]);
 
 	const onRefresh = () => {
 		setRefreshing(true);

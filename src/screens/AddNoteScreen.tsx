@@ -20,7 +20,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { createNote } from "@/lib/notes";
 import { AddNoteScreenProps } from "@/types/navigation";
 
-export default function AddNoteScreen() {
+// eslint-disable-next-line no-empty-pattern
+export default function AddNoteScreen({}: AddNoteScreenProps) {
 	const { user } = useAuth();
 	const navigation = useNavigation<AddNoteScreenProps["navigation"]>();
 

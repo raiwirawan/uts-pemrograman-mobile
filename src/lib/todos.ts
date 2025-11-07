@@ -1,4 +1,4 @@
-// src/lib/todos.ts
+// lib/todos.ts
 import { db } from "@/config/firebase";
 import {
 	addDoc,
@@ -6,128 +6,104 @@ import {
 	deleteDoc,
 	doc,
 	getDoc,
-	getDocs,
+	onSnapshot,
 	orderBy,
 	query,
-	serverTimestamp,
+	Unsubscribe,
 	updateDoc,
 	where,
 } from "firebase/firestore";
 
-export type Todo = {
-	id: string;
+export interface TodoItem {
+	text: string;
+	checked: boolean;
+}
+
+export interface Todo {
+	id?: string;
 	title: string;
-	completed: boolean;
+	items: TodoItem[];
+	color: string;
 	userId: string;
 	createdAt: any;
 	updatedAt: any;
-};
+}
 
-const TODOS_COLLECTION = "todos";
+export const COLORS = [
+	"#FFEB3B",
+	"#FFCDD2",
+	"#C8E6C9",
+	"#BBDEFB",
+	"#D1C4E9",
+] as const;
 
-// === CREATE ===
 export const createTodo = async (
-	userId: string,
-	title: string
-): Promise<string> => {
-	if (!userId) throw new Error("userId diperlukan");
-
-	const docRef = await addDoc(collection(db, TODOS_COLLECTION), {
+	uid: string,
+	title: string,
+	items: TodoItem[],
+	color: string
+) => {
+	return await addDoc(collection(db, "todos"), {
+		userId: uid,
 		title: title.trim(),
-		completed: false,
-		userId,
-		createdAt: serverTimestamp(),
-		updatedAt: serverTimestamp(),
+		items: items.filter((i) => i.text.trim()),
+		color,
+		createdAt: new Date(),
+		updatedAt: new Date(),
 	});
-
-	return docRef.id;
 };
 
-// === READ ALL ===
-export const getUserTodos = async (userId: string): Promise<Todo[]> => {
-	if (!userId) throw new Error("userId diperlukan");
+export const updateTodo = async (
+	uid: string,
+	id: string,
+	data: Partial<Todo>
+) => {
+	return await updateDoc(doc(db, "todos", id), {
+		...data,
+		updatedAt: new Date(),
+	});
+};
 
+export const deleteTodo = async (uid: string, id: string) => {
+	return await deleteDoc(doc(db, "todos", id));
+};
+
+// FIXED: PAKAI where("userId", "==", uid) → AMAN!
+export const getUserTodos = (
+	uid: string,
+	callback: (todos: Todo[]) => void
+): Unsubscribe => {
 	const q = query(
-		collection(db, TODOS_COLLECTION),
-		where("userId", "==", userId),
+		collection(db, "todos"),
+		where("userId", "==", uid), // HANYA AMBIL TODO USER INI
 		orderBy("updatedAt", "desc")
 	);
 
-	const snapshot = await getDocs(q);
-	return snapshot.docs.map((doc) => ({
-		id: doc.id,
-		...doc.data(),
-	})) as Todo[];
+	return onSnapshot(q, (snapshot) => {
+		const todos = snapshot.docs.map((doc) => ({
+			id: doc.id,
+			...doc.data(),
+		})) as Todo[];
+		callback(todos);
+	});
 };
 
-// === READ ONE ===
 export const getTodoById = async (
 	userId: string,
 	todoId: string
 ): Promise<Todo | null> => {
-	if (!userId) throw new Error("userId diperlukan");
+	try {
+		const todoRef = doc(db, "todos", todoId); // ✅ FIXED PATH
+		const todoSnap = await getDoc(todoRef);
 
-	const docRef = doc(db, TODOS_COLLECTION, todoId);
-	const docSnap = await getDoc(docRef);
-
-	if (!docSnap.exists()) return null;
-	const data = docSnap.data();
-	if (data.userId !== userId) throw new Error("Akses ditolak");
-
-	return { id: docSnap.id, ...data } as Todo;
-};
-
-// === UPDATE ===
-export const updateTodo = async (
-	userId: string,
-	todoId: string,
-	updates: { title?: string; completed?: boolean }
-): Promise<void> => {
-	if (!userId) throw new Error("userId diperlukan");
-
-	const docRef = doc(db, TODOS_COLLECTION, todoId);
-	const docSnap = await getDoc(docRef);
-
-	if (!docSnap.exists()) throw new Error("Todo tidak ditemukan");
-	if (docSnap.data().userId !== userId) throw new Error("Akses ditolak");
-
-	await updateDoc(docRef, {
-		...updates,
-		updatedAt: serverTimestamp(),
-	});
-};
-
-// === TOGGLE ===
-export const toggleTodo = async (
-	userId: string,
-	todoId: string
-): Promise<void> => {
-	if (!userId) throw new Error("userId diperlukan");
-
-	const docRef = doc(db, TODOS_COLLECTION, todoId);
-	const docSnap = await getDoc(docRef);
-
-	if (!docSnap.exists()) throw new Error("Todo tidak ditemukan");
-	if (docSnap.data().userId !== userId) throw new Error("Akses ditolak");
-
-	await updateDoc(docRef, {
-		completed: !docSnap.data().completed,
-		updatedAt: serverTimestamp(),
-	});
-};
-
-// === DELETE ===
-export const deleteTodo = async (
-	userId: string,
-	todoId: string
-): Promise<void> => {
-	if (!userId) throw new Error("userId diperlukan");
-
-	const docRef = doc(db, TODOS_COLLECTION, todoId);
-	const docSnap = await getDoc(docRef);
-
-	if (!docSnap.exists()) throw new Error("Todo tidak ditemukan");
-	if (docSnap.data().userId !== userId) throw new Error("Akses ditolak");
-
-	await deleteDoc(docRef);
+		if (todoSnap.exists()) {
+			const data = todoSnap.data();
+			if (data.userId !== userId) return null; // extra safety
+			return { id: todoSnap.id, ...data } as Todo;
+		}
+		return null;
+	} catch (error) {
+		console.error("Error getting todo:", error);
+		return null;
+	}
 };

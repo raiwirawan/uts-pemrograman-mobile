@@ -19,10 +19,11 @@
 		"icon": "./assets/images/icon.png",
 
 		"notification": {
-			"icon": "./assets/images/notification-icon.png",
+			"icon": "./assets/images/favicon.png",
 			"color": "#6A1B9A",
 			"androidMode": "default"
 		},
+
 		"androidNavigationBar": {
 			"backgroundColor": "#FFFFFF",
 			"barStyle": "dark-content"

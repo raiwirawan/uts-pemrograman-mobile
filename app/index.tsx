@@ -7,9 +7,11 @@ import ProtectedRoute from "@/routes/ProtectedRoute";
 
 import type {
 	AddNoteScreenProps,
+	AddTodoScreenProps,
 	ChangePasswordScreenProps,
 	EditNoteScreenProps,
 	EditProfileScreenProps,
+	EditTodoScreenProps,
 	ForgotPasswordScreenProps,
 	HomeScreenProps,
 	LoginScreenProps,
@@ -19,9 +21,11 @@ import type {
 } from "@/types/navigation";
 
 import AddNoteScreen from "@/screens/AddNoteScreen";
+import AddTodoScreen from "@/screens/AddTodoScreen";
 import ChangePasswordScreen from "@/screens/ChangePasswordScreen";
 import EditNoteScreen from "@/screens/EditNoteScreen";
 import EditProfileScreen from "@/screens/EditProfileScreen";
+import EditTodoScreen from "@/screens/EditTodoScreen";
 import ForgotPasswordScreen from "@/screens/ForgotPasswordScreen";
 import HomeScreen from "@/screens/HomeScreen";
 import LoginScreen from "@/screens/LoginScreen";
@@ -137,6 +141,20 @@ export default function App() {
 						{(props) => (
 							<ProtectedRoute>
 								<EditNoteScreen {...(props as EditNoteScreenProps)} />
+							</ProtectedRoute>
+						)}
+					</Stack.Screen>
+					<Stack.Screen name="AddTodo" options={{ title: "Tambah Todo" }}>
+						{(props) => (
+							<ProtectedRoute>
+								<AddTodoScreen {...(props as AddTodoScreenProps)} />
+							</ProtectedRoute>
+						)}
+					</Stack.Screen>
+					<Stack.Screen name="EditTodo" options={{ title: "Edit Todo" }}>
+						{(props) => (
+							<ProtectedRoute>
+								<EditTodoScreen {...(props as EditTodoScreenProps)} />
 							</ProtectedRoute>
 						)}
 					</Stack.Screen>

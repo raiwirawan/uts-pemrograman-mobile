@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { deleteNote, updateNote } from "@/lib/notes";
 import { EditNoteScreenProps } from "@/types/navigation";
 
-export default function EditNoteScreen() {
+export default function EditNoteScreen({}: EditNoteScreenProps) {
 	const route = useRoute<EditNoteScreenProps["route"]>();
 	const navigation = useNavigation<EditNoteScreenProps["navigation"]>();
 	const { user } = useAuth();

@@ -20,7 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { createNote } from "@/lib/notes";
 import { AddNoteScreenProps } from "@/types/navigation";
 
-export default function AddNoteScreen() {
+export default function AddNoteScreen({}: AddNoteScreenProps) {
 	const { user } = useAuth();
 	const navigation = useNavigation<AddNoteScreenProps["navigation"]>();
 

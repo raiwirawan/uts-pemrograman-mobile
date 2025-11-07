@@ -15,6 +15,8 @@ export type RootStackParamList = {
 	Notification: undefined;
 	AddNote: undefined;
 	EditNote: { note: Note };
+	AddTodo: undefined;
+	EditTodo: { todoId: string };
 };
 
 // === TAB PARAM LIST (BARU!) ===
@@ -64,6 +66,14 @@ export type AddNoteScreenProps = NativeStackScreenProps<
 export type EditNoteScreenProps = NativeStackScreenProps<
 	RootStackParamList,
 	"EditNote"
+>;
+export type AddTodoScreenProps = NativeStackScreenProps<
+	RootStackParamList,
+	"AddTodo"
+>;
+export type EditTodoScreenProps = NativeStackScreenProps<
+	RootStackParamList,
+	"EditTodo"
 >;
 
 // === TAB SCREEN PROPS (BARU!) ===

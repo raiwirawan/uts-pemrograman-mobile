@@ -50,6 +50,13 @@ const colors = {
 	OVERLAY: "rgba(0,0,0,0.4)",
 	FAB_BG: "#6A1B9A",
 	FAB_SHADOW: "rgba(106, 27, 154, 0.4)",
+
+	// Di dalam colors object
+	CARD_PURPLE: "#E1BEE7",
+	CARD_BLUE: "#BBDEFB",
+	CARD_GREEN: "#C8E6C9",
+	CARD_YELLOW: "#FFF9C4",
+	CARD_PINK: "#F8BBD0",
 } as const;
 
 export default colors;

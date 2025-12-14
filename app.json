@@ -3,12 +3,6 @@
 		"name": "NoteNote",
 		"description": "Aplikasi catatan dan to-do list sederhana dengan Firebase Auth & Firestore. Catat ide, wujudkan mimpi.",
 		"slug": "notenote",
-		"owner": "raiwirawan",
-		"currentFullName": "NoteNote",
-		"originalFullName": "NoteNote",
-		"runtimeVersion": {
-			"policy": "sdkVersion"
-		},
 		"version": "1.0.0",
 		"platforms": ["ios", "android", "web"],
 		"githubUrl": "https://github.com/raiwirawan/uts-pemrograman-mobile",

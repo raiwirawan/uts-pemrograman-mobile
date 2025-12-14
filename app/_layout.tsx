@@ -1,17 +1,19 @@
 import {
-	Inter_400Regular,
-	Inter_700Bold,
-	useFonts,
+    Inter_400Regular,
+    Inter_700Bold,
+    useFonts,
 } from "@expo-google-fonts/inter";
 import {
-	DarkTheme,
-	DefaultTheme,
-	ThemeProvider,
+    DarkTheme,
+    DefaultTheme,
+    ThemeProvider,
 } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { useColorScheme } from "react-native";
+
+import { requestNotificationPermissions } from "@/lib/notifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,6 +27,7 @@ function RootLayout() {
 	useEffect(() => {
 		if (fontsLoaded) {
 			SplashScreen.hideAsync();
+			requestNotificationPermissions();
 		}
 	}, [fontsLoaded]);
 

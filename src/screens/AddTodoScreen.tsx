@@ -2,17 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useState } from "react";
 import {
-	Alert,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	View,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
+import { showNotification } from "@/lib/notifications";
 import { createTodo, TodoItem } from "@/lib/todos";
 import { AddTodoScreenProps } from "@/types/navigation";
 
@@ -64,6 +65,7 @@ export default function AddTodoScreen({}: AddTodoScreenProps) {
 		setSaving(true);
 		try {
 			await createTodo(user!.uid, title.trim(), items, selectedColor);
+			await showNotification("Todo Ditambahkan", `Todo "${title.trim()}" berhasil dibuat!`);
 			navigation.goBack();
 		} catch (error) {
 			Alert.alert(

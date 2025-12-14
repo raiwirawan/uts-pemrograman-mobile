@@ -3,21 +3,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useEffect, useState } from "react";
 import {
-	ActivityIndicator,
-	Alert,
-	KeyboardAvoidingView,
-	Platform,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
 import { createNote } from "@/lib/notes";
+import { showNotification } from "@/lib/notifications";
 import { AddNoteScreenProps } from "@/types/navigation";
 
 // eslint-disable-next-line no-empty-pattern
@@ -68,6 +69,7 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 		setSaving(true);
 		try {
 			await createNote(user.uid, title.trim(), content.trim());
+			await showNotification("Catatan Ditambahkan", `Catatan "${title.trim()}" berhasil dibuat!`);
 			setHasChanges(false);
 			navigation.goBack();
 		} catch (err: any) {

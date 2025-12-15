@@ -1,4 +1,3 @@
-// app/(tabs)/notes.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import {
@@ -16,6 +15,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -25,7 +25,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { deleteNote, getUserNotes, Note } from "@/lib/notes";
 import { NotesScreenProps } from "@/types/navigation";
 
-// Tipe untuk pilihan sort
+// Tipe untuk pilihan urutan
 type SortOption = "newest" | "oldest" | "az" | "za";
 
 // eslint-disable-next-line no-empty-pattern
@@ -33,17 +33,18 @@ function NotesScreen({}: NotesScreenProps) {
   const { user } = useAuth();
   const navigation = useNavigation<NotesScreenProps["navigation"]>();
 
-  // State Data
+  // === 1. STATE MANAGEMENT ===
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // State Sorting (Baru)
+  // State untuk Search & Sort
+  const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [showSortMenu, setShowSortMenu] = useState(false);
 
-  // 1. Tambahkan Tombol Filter ke Header (Baru)
+  // === 2. HEADER BUTTON (Tombol Filter) ===
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -57,9 +58,9 @@ function NotesScreen({}: NotesScreenProps) {
     });
   }, [navigation]);
 
+  // === 3. LOAD DATA DARI FIREBASE ===
   const loadNotes = useCallback(async () => {
     if (!user?.uid) return;
-
     try {
       const data = await getUserNotes(user.uid);
       setNotes(data);
@@ -82,14 +83,23 @@ function NotesScreen({}: NotesScreenProps) {
     }
   }, [user?.uid, loadNotes]);
 
-  // 2. Logika Sorting Otomatis (Baru)
-  const sortedNotes = useMemo(() => {
-    // Kita copy array dulu agar state asli tidak berubah langsung
-    const data = [...notes];
+  // === 4. LOGIKA PINTAR: SEARCH + SORT (GABUNGAN) ===
+  const filteredAndSortedNotes = useMemo(() => {
+    let data = [...notes];
 
+    // A. Filter Search (Jika ada ketikan di search bar)
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      data = data.filter(
+        (note) =>
+          note.title.toLowerCase().includes(lowerQuery) ||
+          note.content.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    // B. Sorting (Mengurutkan hasil filter tadi)
     switch (sortOption) {
       case "newest":
-        // Sort berdasarkan updatedAt (Timestamp seconds) besar ke kecil
         return data.sort((a, b) => b.updatedAt.seconds - a.updatedAt.seconds);
       case "oldest":
         return data.sort((a, b) => a.updatedAt.seconds - b.updatedAt.seconds);
@@ -100,7 +110,7 @@ function NotesScreen({}: NotesScreenProps) {
       default:
         return data;
     }
-  }, [notes, sortOption]);
+  }, [notes, searchQuery, sortOption]); // <-- Kode akan jalan ulang otomatis jika 3 hal ini berubah
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -109,7 +119,6 @@ function NotesScreen({}: NotesScreenProps) {
 
   const handleDelete = async (id: string) => {
     if (!user?.uid) return;
-
     try {
       await deleteNote(user.uid, id);
       setNotes((prev) => prev.filter((n) => n.id !== id));
@@ -137,18 +146,14 @@ function NotesScreen({}: NotesScreenProps) {
       </Text>
       <TouchableOpacity
         onPress={() =>
-          Alert.alert(
-            "Hapus Catatan",
-            "Apakah Anda yakin ingin menghapus catatan ini?",
-            [
-              { text: "Batal", style: "cancel" },
-              {
-                text: "Hapus",
-                style: "destructive",
-                onPress: () => handleDelete(item.id),
-              },
-            ]
-          )
+          Alert.alert("Hapus Catatan", "Yakin hapus catatan ini?", [
+            { text: "Batal", style: "cancel" },
+            {
+              text: "Hapus",
+              style: "destructive",
+              onPress: () => handleDelete(item.id),
+            },
+          ])
         }
         style={styles.deleteBtn}
       >
@@ -161,7 +166,6 @@ function NotesScreen({}: NotesScreenProps) {
     return (
       <View style={styles.centerContent}>
         <ActivityIndicator size="large" color={colors.PRIMARY_PURPLE} />
-        <Text style={styles.loadingText}>Memuat catatan...</Text>
       </View>
     );
   }
@@ -180,23 +184,50 @@ function NotesScreen({}: NotesScreenProps) {
 
   return (
     <View style={styles.container}>
+      {/* === SEARCH BAR UI === */}
+      <View style={styles.searchContainer}>
+        <Ionicons
+          name="search"
+          size={20}
+          color={colors.TEXT_GREY}
+          style={{ marginRight: 8 }}
+        />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Cari judul atau isi..."
+          value={searchQuery}
+          onChangeText={setSearchQuery} // <-- Update state saat mengetik
+          placeholderTextColor={colors.TEXT_LIGHT_GREY}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <Ionicons name="close-circle" size={20} color={colors.TEXT_GREY} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <FlatList
-        data={sortedNotes} // <--- GANTI 'notes' JADI 'sortedNotes'
+        data={filteredAndSortedNotes} // <-- PENTING: Pakai data hasil filter!
         renderItem={renderNote}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons
-              name="document-outline"
-              size={100}
+              name={searchQuery ? "search" : "document-outline"}
+              size={80}
               color={colors.DIVIDER}
             />
-            <Text style={styles.emptyTitle}>Belum ada catatan</Text>
+            <Text style={styles.emptyTitle}>
+              {searchQuery ? "Tidak ditemukan" : "Belum ada catatan"}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              Tekan tombol + untuk membuat catatan pertama Anda
+              {searchQuery
+                ? `Tidak ada hasil untuk "${searchQuery}"`
+                : "Tekan tombol + untuk membuat catatan baru"}
             </Text>
           </View>
         }
@@ -210,7 +241,7 @@ function NotesScreen({}: NotesScreenProps) {
         <Ionicons name="add" size={30} color={colors.WHITE} />
       </TouchableOpacity>
 
-      {/* 3. MODAL PILIHAN SORT (Baru) */}
+      {/* MODAL SORT UI */}
       <Modal
         visible={showSortMenu}
         transparent={true}
@@ -241,7 +272,7 @@ function NotesScreen({}: NotesScreenProps) {
                 size={20}
                 color={colors.PRIMARY_PURPLE}
               />
-              <Text style={styles.optionText}>Terbaru diupdate</Text>
+              <Text style={styles.optionText}>Terbaru</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -260,7 +291,7 @@ function NotesScreen({}: NotesScreenProps) {
                 size={20}
                 color={colors.PRIMARY_PURPLE}
               />
-              <Text style={styles.optionText}>Terlama diupdate</Text>
+              <Text style={styles.optionText}>Terlama</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -277,7 +308,7 @@ function NotesScreen({}: NotesScreenProps) {
                 size={20}
                 color={colors.PRIMARY_PURPLE}
               />
-              <Text style={styles.optionText}>Judul (A-Z)</Text>
+              <Text style={styles.optionText}>A-Z</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -294,7 +325,7 @@ function NotesScreen({}: NotesScreenProps) {
                 size={20}
                 color={colors.PRIMARY_PURPLE}
               />
-              <Text style={styles.optionText}>Judul (Z-A)</Text>
+              <Text style={styles.optionText}>Z-A</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -306,8 +337,26 @@ function NotesScreen({}: NotesScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingVertical: 20,
     backgroundColor: colors.BACKGROUND,
+  },
+  // Styles untuk Search Bar
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.WHITE,
+    margin: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.DIVIDER,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: colors.TEXT_DARK,
   },
   centerContent: {
     flex: 1,
@@ -318,7 +367,7 @@ const styles = StyleSheet.create({
   noteCard: {
     backgroundColor: colors.WHITE,
     padding: 16,
-    marginHorizontal: 12,
+    marginHorizontal: 16,
     marginVertical: 6,
     borderRadius: 12,
     shadowColor: colors.SHADOW,
@@ -329,10 +378,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: "bold",
-    fontFamily: "Poppins-Bold", // Pastikan font terpakai
+    fontFamily: "Poppins-Bold",
     color: colors.TEXT_DARK,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   description: {
     fontSize: 14,
@@ -373,20 +421,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 40,
-    paddingVertical: 160,
+    paddingVertical: 100,
   },
   emptyTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontFamily: "Poppins-Bold",
     color: colors.TEXT_DARK,
     marginTop: 20,
     marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: 16,
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
     color: colors.TEXT_GREY,
     textAlign: "center",
-    marginBottom: 30,
   },
   errorText: {
     color: colors.DANGER,
@@ -400,17 +448,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
   },
-  retryText: {
-    color: colors.WHITE,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  loadingText: {
-    marginTop: 16,
-    color: colors.TEXT_GREY,
-    fontSize: 16,
-  },
-  // Styles untuk Modal (Baru)
+  retryText: { color: colors.WHITE, fontSize: 16, fontWeight: "600" },
+
+  // Styles Modal Sort
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

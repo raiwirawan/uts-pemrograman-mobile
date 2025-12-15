@@ -1,8 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+	ActivityIndicator,
 	Alert,
+	KeyboardAvoidingView,
+	Platform,
 	ScrollView,
 	StyleSheet,
 	Text,
@@ -13,277 +16,230 @@ import {
 
 import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
-import { createTodo, TodoItem } from "@/lib/todos";
+import { createTodo } from "@/lib/todos";
 import { AddTodoScreenProps } from "@/types/navigation";
 
-const COLOR_OPTIONS = [
-	colors.CARD_PURPLE,
-	colors.CARD_BLUE,
-	colors.CARD_GREEN,
-	colors.CARD_YELLOW,
-	colors.CARD_PINK,
-];
-
+// Menggunakan AddTodoScreenProps
 // eslint-disable-next-line no-empty-pattern
 export default function AddTodoScreen({}: AddTodoScreenProps) {
 	const { user } = useAuth();
-	const navigation = useNavigation();
+	const navigation = useNavigation<AddTodoScreenProps["navigation"]>();
+
+	// Menggunakan 'description' untuk Todo (bukan 'content')
 	const [title, setTitle] = useState("");
-	const [items, setItems] = useState<TodoItem[]>([]);
-	const [currentItem, setCurrentItem] = useState("");
-	const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
+	const [description, setDescription] = useState("");
 	const [saving, setSaving] = useState(false);
+	const [hasChanges, setHasChanges] = useState(false);
 
-	const addItem = () => {
-		if (currentItem.trim()) {
-			setItems([...items, { text: currentItem.trim(), checked: false }]);
-			setCurrentItem("");
-		}
-	};
+	// === BACK HANDLER: CONFIRM UNSAVED CHANGES ===
+	useEffect(() => {
+		const unsubscribe = navigation.addListener("beforeRemove", (e) => {
+			// Cek perubahan hanya pada title atau description
+			if (!hasChanges || saving) return;
 
-	const toggleItem = (index: number) => {
-		const updated = [...items];
-		updated[index].checked = !updated[index].checked;
-		setItems(updated);
-	};
+			e.preventDefault();
+			Alert.alert(
+				"Buang perubahan?",
+				"To-Do belum disimpan. Keluar tanpa simpan?",
+				[
+					{ text: "Tetap di sini", style: "cancel" },
+					{
+						text: "Buang",
+						style: "destructive",
+						onPress: () => navigation.dispatch(e.data.action),
+					},
+				]
+			);
+		});
 
-	const deleteItem = (index: number) => {
-		setItems(items.filter((_, i) => i !== index));
-	};
+		return unsubscribe;
+	}, [navigation, hasChanges, saving]);
 
+	// === SAVE TODO ===
 	const handleSave = async () => {
 		if (!title.trim()) {
-			Alert.alert("Error", "Title tidak boleh kosong");
+			Alert.alert("Error", "Judul To-Do wajib diisi");
 			return;
 		}
-		if (items.length === 0) {
-			Alert.alert("Error", "Tambahkan minimal 1 item");
+
+		if (!user?.uid) {
+			Alert.alert("Error", "User tidak ditemukan");
 			return;
 		}
 
 		setSaving(true);
 		try {
-			await createTodo(user!.uid, title.trim(), items, selectedColor);
+			// Deskripsi diizinkan kosong
+			await createTodo(user.uid, title.trim(), description.trim());
+			setHasChanges(false);
 			navigation.goBack();
-		} catch (error) {
+		} catch (err: any) {
+			console.error("Error creating todo:", err);
 			Alert.alert(
-				"Error",
-				error instanceof Error ? error.message : "Gagal menyimpan todo"
+				"Gagal menyimpan",
+				err.message || "Pastikan izin Firebase sudah benar."
 			);
+		} finally {
 			setSaving(false);
 		}
 	};
 
 	return (
-		<View style={styles.container}>
-			<ScrollView contentContainerStyle={styles.scrollContent}>
-				{/* Title Input */}
+		<KeyboardAvoidingView
+			behavior={Platform.OS === "ios" ? "padding" : "height"}
+			style={styles.container}
+			// Sesuaikan offset agar tombol tidak tertutup keyboard
+			keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 50}
+		>
+			{/* SCROLL CONTENT */}
+			<ScrollView
+				style={styles.scrollView}
+				contentContainerStyle={styles.scrollContent}
+				keyboardShouldPersistTaps="handled"
+				showsVerticalScrollIndicator={false}
+			>
+				{/* JUDUL */}
+				<Text style={styles.label}>Judul To-Do</Text>
 				<TextInput
 					style={styles.titleInput}
-					placeholder="Judul Todo..."
-					placeholderTextColor={colors.TEXT_GREY}
+					placeholder="Masukkan judul To-Do..."
+					placeholderTextColor={colors.TEXT_LIGHT_GREY}
 					value={title}
-					onChangeText={setTitle}
-					maxLength={50}
+					onChangeText={(text) => {
+						setTitle(text);
+						setHasChanges(true);
+					}}
 				/>
 
-				{/* Color Picker */}
-				<Text style={styles.label}>Pilih Warna:</Text>
-				<View style={styles.colorRow}>
-					{COLOR_OPTIONS.map((color) => (
-						<TouchableOpacity
-							key={color}
-							style={[
-								styles.colorCircle,
-								{ backgroundColor: color },
-								selectedColor === color && styles.colorSelected,
-							]}
-							onPress={() => setSelectedColor(color)}
-						>
-							{selectedColor === color && (
-								<Ionicons name="checkmark" size={20} color={colors.WHITE} />
-							)}
-						</TouchableOpacity>
-					))}
-				</View>
-
-				{/* Add Item Input */}
-				<Text style={styles.label}>Item Checklist:</Text>
-				<View style={styles.inputRow}>
-					<TextInput
-						style={styles.itemInput}
-						placeholder="Tambah item..."
-						placeholderTextColor={colors.TEXT_GREY}
-						value={currentItem}
-						onChangeText={setCurrentItem}
-						onSubmitEditing={addItem}
-						returnKeyType="done"
-					/>
-					<TouchableOpacity style={styles.addButton} onPress={addItem}>
-						<Ionicons name="add" size={24} color={colors.WHITE} />
-					</TouchableOpacity>
-				</View>
-
-				{/* Items List */}
-				{items.map((item, index) => (
-					<View key={index} style={styles.itemCard}>
-						<TouchableOpacity
-							style={styles.itemContent}
-							onPress={() => toggleItem(index)}
-						>
-							<Ionicons
-								name={item.checked ? "checkbox" : "square-outline"}
-								size={22}
-								color={colors.PRIMARY_PURPLE}
-							/>
-							<Text
-								style={[
-									styles.itemText,
-									item.checked && styles.itemTextChecked,
-								]}
-							>
-								{item.text}
-							</Text>
-						</TouchableOpacity>
-						<TouchableOpacity onPress={() => deleteItem(index)}>
-							<Ionicons name="trash-outline" size={20} color={colors.DANGER} />
-						</TouchableOpacity>
-					</View>
-				))}
+				{/* DESKRIPSI (menggantikan Isi Catatan) */}
+				<Text style={styles.label}>Deskripsi (Opsional)</Text>
+				<TextInput
+					style={styles.contentInput}
+					placeholder="Tulis detail To-Do di sini..."
+					placeholderTextColor={colors.TEXT_LIGHT_GREY}
+					value={description}
+					onChangeText={(text) => {
+						setDescription(text);
+						setHasChanges(true);
+					}}
+					multiline
+					textAlignVertical="top"
+				/>
 			</ScrollView>
 
-			{/* Save Button */}
-			<TouchableOpacity
-				style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-				onPress={handleSave}
-				disabled={saving}
-			>
-				<Text style={styles.saveButtonText}>
-					{saving ? "Menyimpan..." : "Simpan Todo"}
-				</Text>
-			</TouchableOpacity>
-		</View>
+			{/* FOOTER - Tombol Simpan */}
+			<View style={styles.footer}>
+				<View style={styles.buttonRow}>
+					<TouchableOpacity
+						style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+						onPress={handleSave}
+						disabled={saving || !title.trim()} // Nonaktif jika saving atau title kosong
+					>
+						{saving ? (
+							<ActivityIndicator color={colors.WHITE} />
+						) : (
+							<>
+								<Ionicons name="checkmark" size={20} color={colors.WHITE} />
+								<Text style={styles.saveText}>Simpan To-Do</Text>
+							</>
+						)}
+					</TouchableOpacity>
+				</View>
+			</View>
+		</KeyboardAvoidingView>
 	);
 }
 
+// STYLES SAMA PERSIS DENGAN ADDNOTE/EDITNOTE UNTUK KONSISTENSI
 const styles = StyleSheet.create({
+	safeArea: {
+		flex: 1,
+		backgroundColor: colors.WHITE,
+	},
 	container: {
 		flex: 1,
-		backgroundColor: colors.BACKGROUND,
+	},
+	scrollView: {
+		flex: 1,
 	},
 	scrollContent: {
-		padding: 16,
-		paddingBottom: 100,
-	},
-	titleInput: {
-		fontSize: 24,
-		fontWeight: "bold",
-		color: colors.TEXT_DARK,
-		borderBottomWidth: 2,
-		borderBottomColor: colors.PRIMARY_PURPLE,
-		paddingVertical: 8,
-		marginBottom: 20,
+		padding: 20,
+		paddingBottom: 20,
 	},
 	label: {
-		fontSize: 16,
+		fontSize: 14,
 		fontWeight: "600",
-		color: colors.TEXT_DARK,
-		marginBottom: 8,
-		marginTop: 12,
-	},
-	colorRow: {
-		flexDirection: "row",
-		gap: 12,
-		marginBottom: 20,
-	},
-	colorCircle: {
-		width: 50,
-		height: 50,
-		borderRadius: 25,
-		justifyContent: "center",
-		alignItems: "center",
-		elevation: 2,
-		shadowColor: colors.SHADOW,
-		shadowOpacity: 0.2,
-		shadowOffset: { width: 0, height: 1 },
-		shadowRadius: 2,
-	},
-	colorSelected: {
-		borderWidth: 3,
-		borderColor: colors.TEXT_DARK,
-	},
-	inputRow: {
-		flexDirection: "row",
-		gap: 8,
-		marginBottom: 16,
-	},
-	itemInput: {
-		flex: 1,
-		backgroundColor: colors.WHITE,
-		borderRadius: 8,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		fontSize: 16,
-		color: colors.TEXT_DARK,
-		borderWidth: 1,
-		borderColor: colors.INPUT_BORDER,
-	},
-	addButton: {
-		backgroundColor: colors.PRIMARY_PURPLE,
-		width: 44,
-		height: 44,
-		borderRadius: 8,
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	itemCard: {
-		flexDirection: "row",
-		alignItems: "center",
-		backgroundColor: colors.WHITE,
-		padding: 12,
-		borderRadius: 8,
-		marginBottom: 8,
-		elevation: 1,
-		shadowColor: colors.SHADOW,
-		shadowOpacity: 0.1,
-		shadowOffset: { width: 0, height: 1 },
-		shadowRadius: 2,
-	},
-	itemContent: {
-		flex: 1,
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
-	},
-	itemText: {
-		fontSize: 16,
-		color: colors.TEXT_DARK,
-	},
-	itemTextChecked: {
-		textDecorationLine: "line-through",
 		color: colors.TEXT_GREY,
+		marginBottom: 8,
 	},
-	saveButton: {
-		position: "absolute",
-		bottom: 20,
-		left: 16,
-		right: 16,
-		backgroundColor: colors.PRIMARY_PURPLE,
-		paddingVertical: 16,
+	titleInput: {
+		fontSize: 20,
+		fontWeight: "bold",
+		paddingVertical: 14,
+		paddingHorizontal: 16,
+		borderWidth: 1,
+		borderColor: colors.DIVIDER,
 		borderRadius: 12,
-		alignItems: "center",
-		elevation: 4,
+		marginBottom: 20,
+		backgroundColor: colors.CARD_BG,
+		color: colors.TEXT_DARK,
+	},
+	contentInput: {
+		fontSize: 16,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: colors.DIVIDER,
+		borderRadius: 12,
+		minHeight: 320,
+		backgroundColor: colors.CARD_BG,
+		lineHeight: 24,
+		color: colors.TEXT_DARK,
+	},
+	footer: {
+		paddingHorizontal: 20,
+		paddingVertical: 16,
+		backgroundColor: colors.WHITE,
+		borderTopWidth: 1,
+		borderTopColor: colors.DIVIDER,
+		elevation: 8,
 		shadowColor: colors.SHADOW,
-		shadowOpacity: 0.3,
-		shadowOffset: { width: 0, height: 2 },
+		shadowOffset: { width: 0, height: -2 },
+		shadowOpacity: 0.1,
 		shadowRadius: 4,
 	},
-	saveButtonDisabled: {
-		backgroundColor: colors.TEXT_GREY,
+	buttonRow: {
+		flexDirection: "row",
+		justifyContent: "center",
+		gap: 12,
 	},
-	saveButtonText: {
+	saveBtn: {
+		flex: 1, // Menggunakan flex 1 karena hanya ada 1 tombol save
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 16,
+		borderRadius: 12,
+		backgroundColor: colors.FAB_BG,
+		gap: 10,
+	},
+	saveBtnDisabled: {
+		opacity: 0.7,
+	},
+	saveText: {
 		color: colors.WHITE,
-		fontSize: 18,
-		fontWeight: "bold",
+		fontSize: 16,
+		fontWeight: "600",
+	},
+	// Gaya untuk konsistensi dengan Notes
+	centerContent: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		padding: 20,
+	},
+	loadingText: {
+		marginTop: 16,
+		color: colors.TEXT_GREY,
+		fontSize: 16,
 	},
 });

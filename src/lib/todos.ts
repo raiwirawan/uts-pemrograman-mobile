@@ -1,109 +1,166 @@
-// lib/todos.ts
-import { db } from "@/config/firebase";
 import {
 	addDoc,
 	collection,
 	deleteDoc,
 	doc,
+	DocumentData,
+	DocumentSnapshot,
 	getDoc,
 	onSnapshot,
 	orderBy,
 	query,
-	Unsubscribe,
+	QuerySnapshot,
+	serverTimestamp,
+	Timestamp,
 	updateDoc,
-	where,
 } from "firebase/firestore";
+import { db } from "../config/firebase"; // <-- Menggunakan impor relatif: "./firebase"
 
-export interface TodoItem {
-	text: string;
-	checked: boolean;
-}
+// --- 1. INTERFACE & TYPES ---
 
 export interface Todo {
 	id?: string;
-	title: string;
-	items: TodoItem[];
-	color: string;
 	userId: string;
-	createdAt: any;
-	updatedAt: any;
+	title: string;
+	description?: string;
+	checked: boolean;
+	createdAt: Timestamp | Date | any;
+	updatedAt: Timestamp | Date | any;
 }
 
-export const COLORS = [
-	"#FFEB3B",
-	"#FFCDD2",
-	"#C8E6C9",
-	"#BBDEFB",
-	"#D1C4E9",
-] as const;
+// --- 2. HELPERS ---
+
+type FirestoreSnapshot =
+	| QuerySnapshot<DocumentData>
+	| DocumentSnapshot<DocumentData>;
+
+const todoConverter = {
+	toFirestore: (todo: Partial<Todo>): DocumentData => {
+		return {
+			userId: todo.userId,
+			title: todo.title,
+			description: todo.description || "",
+			checked: todo.checked || false,
+			updatedAt: serverTimestamp(),
+			...(todo.createdAt && { createdAt: todo.createdAt }),
+		};
+	},
+
+	fromFirestore: (snapshot: FirestoreSnapshot): Todo[] | Todo => {
+		// 1. Cek jika ini adalah snapshot dokumen tunggal (DocumentSnapshot)
+		if (!("docs" in snapshot)) {
+			const docSnap = snapshot as DocumentSnapshot<DocumentData>;
+
+			if (!docSnap.exists()) {
+				// Tidak akan terjadi karena sudah dicek di getTodo, tapi jaga-jaga
+				throw new Error("Document data is null (does not exist).");
+			}
+
+			const docData = docSnap.data();
+			if (!docData) throw new Error("Document data is null.");
+
+			return {
+				id: docSnap.id,
+				userId: docData.userId,
+				title: docData.title,
+				description: docData.description,
+				checked: docData.checked,
+				createdAt: docData.createdAt,
+				updatedAt: docData.updatedAt,
+			} as Todo;
+		}
+
+		// 2. Jika ini adalah QuerySnapshot (Daftar dokumen)
+		const querySnap = snapshot as QuerySnapshot<DocumentData>;
+
+		return querySnap.docs.map(
+			(doc) =>
+				({
+					id: doc.id,
+					userId: doc.data().userId,
+					title: doc.data().title,
+					description: doc.data().description,
+					checked: doc.data().checked,
+					createdAt: doc.data().createdAt,
+					updatedAt: doc.data().updatedAt,
+				}) as Todo
+		);
+	},
+};
+
+// --- 3. CRUD OPERATIONS ---
+
+const getTodosCollectionRef = (userId: string) =>
+	collection(db, "users", userId, "todos");
 
 export const createTodo = async (
-	uid: string,
+	userId: string,
 	title: string,
-	items: TodoItem[],
-	color: string
+	description: string
 ) => {
-	return await addDoc(collection(db, "todos"), {
-		userId: uid,
-		title: title.trim(),
-		items: items.filter((i) => i.text.trim()),
-		color,
-		createdAt: new Date(),
-		updatedAt: new Date(),
-	});
+	const todosRef = getTodosCollectionRef(userId);
+
+	const newTodoData: Partial<Todo> & { createdAt: any; updatedAt: any } = {
+		userId,
+		title,
+		description,
+		checked: false,
+		createdAt: serverTimestamp(),
+		updatedAt: serverTimestamp(),
+	};
+
+	await addDoc(todosRef, newTodoData);
 };
 
-export const updateTodo = async (
-	uid: string,
-	id: string,
-	data: Partial<Todo>
-) => {
-	return await updateDoc(doc(db, "todos", id), {
-		...data,
-		updatedAt: new Date(),
-	});
-};
-
-export const deleteTodo = async (uid: string, id: string) => {
-	return await deleteDoc(doc(db, "todos", id));
-};
-
-// FIXED: PAKAI where("userId", "==", uid) → AMAN!
-export const getUserTodos = (
-	uid: string,
-	callback: (todos: Todo[]) => void
-): Unsubscribe => {
-	const q = query(
-		collection(db, "todos"),
-		where("userId", "==", uid), // HANYA AMBIL TODO USER INI
-		orderBy("updatedAt", "desc")
-	);
-
-	return onSnapshot(q, (snapshot) => {
-		const todos = snapshot.docs.map((doc) => ({
-			id: doc.id,
-			...doc.data(),
-		})) as Todo[];
-		callback(todos);
-	});
-};
-
-export const getTodoById = async (
+export const getTodo = async (
 	userId: string,
 	todoId: string
 ): Promise<Todo | null> => {
-	try {
-		const todoRef = doc(db, "todos", todoId); // ✅ FIXED PATH
-		const todoSnap = await getDoc(todoRef);
+	const todoRef = doc(db, "users", userId, "todos", todoId);
+	const docSnap = await getDoc(todoRef);
 
-		if (todoSnap.exists()) {
-			const data = todoSnap.data();
-			if (data.userId !== userId) return null; // extra safety
-			return { id: todoSnap.id, ...data } as Todo;
-		}
-		return null;
-	} catch (error) {
-		console.error("Error getting todo:", error);
-		return null;
+	if (docSnap.exists()) {
+		return todoConverter.fromFirestore(docSnap) as Todo;
 	}
+	return null;
+};
+
+export const updateTodo = async (
+	userId: string,
+	todoId: string,
+	updates: Partial<Omit<Todo, "userId" | "createdAt">>
+) => {
+	const todoRef = doc(db, "users", userId, "todos", todoId);
+
+	await updateDoc(todoRef, {
+		...updates,
+		updatedAt: serverTimestamp(),
+	});
+};
+
+export const deleteTodo = async (userId: string, todoId: string) => {
+	const todoRef = doc(db, "users", userId, "todos", todoId);
+	await deleteDoc(todoRef);
+};
+
+export const getUserTodos = (
+	userId: string,
+	callback: (todos: Todo[]) => void
+) => {
+	const todosRef = getTodosCollectionRef(userId);
+
+	const todosQuery = query(todosRef, orderBy("updatedAt", "desc"));
+
+	const unsubscribe = onSnapshot(
+		todosQuery,
+		(snapshot) => {
+			const todos = todoConverter.fromFirestore(snapshot) as Todo[];
+			callback(todos);
+		},
+		(error) => {
+			console.error("Error fetching todos: ", error);
+		}
+	);
+
+	return unsubscribe;
 };

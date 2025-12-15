@@ -4,17 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
+	FlatList,
 	RefreshControl,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
 	View,
 } from "react-native";
-import DraggableFlatList, {
-	RenderItemParams,
-} from "react-native-draggable-flatlist";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import Swipeable from "react-native-gesture-handler/Swipeable";
 import Animated, { FadeIn } from "react-native-reanimated";
 
 import colors from "@/constants/colors";
@@ -28,6 +24,7 @@ export default function TodoListScreen() {
 	const [todos, setTodos] = useState<Todo[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
 	const loadTodos = useCallback(() => {
 		if (!user?.uid) {
@@ -35,176 +32,275 @@ export default function TodoListScreen() {
 			return;
 		}
 		setRefreshing(true);
+		setError(null);
+
 		const unsubscribe = getUserTodos(user.uid, (data) => {
 			setTodos(data);
 			setLoading(false);
 			setRefreshing(false);
 		});
 
-		// unsubscribe setelah beberapa detik supaya snapshot tidak ganda
-		setTimeout(() => unsubscribe(), 1000);
+		return unsubscribe;
 	}, [user?.uid]);
 
 	useEffect(() => {
-		loadTodos();
+		const unsubscribe = loadTodos();
+		return () => {
+			if (unsubscribe) {
+				unsubscribe();
+			}
+		};
 	}, [user?.uid, loadTodos]);
 
-	const onRefresh = () => {
+	const onRefresh = useCallback(() => {
 		setRefreshing(true);
 		loadTodos();
-	};
+	}, [loadTodos]);
 
 	const handleDelete = (id: string) => {
-		Alert.alert("Hapus Todo", "Yakin ingin menghapus?", [
+		Alert.alert("Hapus To-Do", "Apakah Anda yakin ingin menghapus To-Do ini?", [
 			{ text: "Batal", style: "cancel" },
 			{
 				text: "Hapus",
 				style: "destructive",
-				onPress: () => deleteTodo(user!.uid, id),
+				onPress: async () => {
+					if (!user?.uid) return;
+					try {
+						await deleteTodo(user.uid, id);
+						setTodos((prev) => prev.filter((t) => t.id !== id));
+					} catch (err: any) {
+						Alert.alert("Gagal", err.message);
+					}
+				},
 			},
 		]);
 	};
 
-	const renderRightActions = (id: string) => (
-		<TouchableOpacity
-			style={styles.deleteAction}
-			onPress={() => handleDelete(id)}
-		>
-			<Ionicons name="trash" size={24} color={colors.WHITE} />
-		</TouchableOpacity>
-	);
+	// Fungsi: Toggle Status Checked
+	const handleToggleCheck = async (todo: Todo) => {
+		if (!user?.uid || !todo.id) return;
 
-	const renderTodo = ({ item, drag }: RenderItemParams<Todo>) => (
-		<Swipeable
-			renderRightActions={() => renderRightActions(item.id!)}
-			overshootRight={false}
-		>
-			<Animated.View
-				entering={FadeIn}
-				style={[styles.card, { backgroundColor: item.color }]}
+		// Optimistic update
+		// Pastikan updatedAt adalah objek Date agar toLocaleString() tetap berfungsi sebelum sync Firestore
+		const newTodos = todos.map((t) =>
+			t.id === todo.id
+				? { ...t, checked: !t.checked, updatedAt: new Date() }
+				: t
+		);
+		setTodos(newTodos);
+
+		try {
+			await updateTodo(user.uid, todo.id, { checked: !todo.checked });
+		} catch (error) {
+			console.error("Gagal toggle check", error);
+			Alert.alert("Gagal", "Gagal memperbarui status To-Do.");
+			setTodos(todos);
+		}
+	};
+
+	// Render item To-Do
+	const renderTodo = ({ item }: { item: Todo }) => (
+		<Animated.View entering={FadeIn}>
+			<TouchableOpacity
+				// Edit: Langsung diarahkan ke screen update/edit
+				onPress={() => {
+					// @ts-ignore
+					navigation.navigate("EditTodo", { todoId: item.id });
+				}}
+				style={styles.noteCard}
 			>
+				{/* Status Checked (Tombol Checklis di Kiri) */}
 				<TouchableOpacity
-					onPress={() => {
-						// @ts-ignore
-						navigation.navigate("EditTodo", { todoId: item.id });
-					}}
-					onLongPress={drag}
-					style={{ flex: 1 }}
+					onPress={() => handleToggleCheck(item)}
+					style={styles.checkButton}
 				>
-					<Text style={styles.title}>{item.title}</Text>
-					{item.items.map((task, i) => (
-						<View key={i} style={styles.row}>
-							<Ionicons
-								name={task.checked ? "checkbox" : "square-outline"}
-								size={18}
-								color={colors.TEXT_DARK}
-							/>
-							<Text style={styles.taskText}>{task.text}</Text>
-						</View>
-					))}
-					<Text style={styles.date}>
-						{new Date(
-							item.updatedAt?.seconds * 1000 || Date.now()
-						).toLocaleDateString()}
-					</Text>
+					<Ionicons
+						name={item.checked ? "checkbox-outline" : "square-outline"}
+						size={30}
+						color={item.checked ? colors.SUCCESS : colors.TEXT_GREY}
+					/>
 				</TouchableOpacity>
-			</Animated.View>
-		</Swipeable>
+
+				{/* Konten Judul & Deskripsi */}
+				<View style={styles.contentContainer}>
+					<Text
+						style={[styles.title, item.checked && styles.titleChecked]}
+						numberOfLines={1}
+					>
+						{item.title}
+					</Text>
+
+					{(item.description || "").trim() ? (
+						<Text
+							style={[
+								styles.description,
+								item.checked && styles.descriptionChecked,
+							]}
+							numberOfLines={2}
+						>
+							{item.description}
+						</Text>
+					) : null}
+
+					{/* BARIS KRITIS YANG DIPERBAIKI */}
+					<Text style={styles.date}>
+						Status: {item.checked ? "Selesai" : "Belum Selesai"} | Diperbarui:{" "}
+						{
+							// Cek apakah item.updatedAt adalah objek Firestore Timestamp (punya .toDate)
+							item.updatedAt?.toDate
+								? item.updatedAt.toDate().toLocaleString()
+								: // Jika tidak, asumsikan itu adalah objek Date JavaScript biasa
+									(item.updatedAt?.toLocaleString() ??
+									"Tidak ada tanggal update")
+						}
+					</Text>
+				</View>
+
+				{/* Tombol Hapus */}
+				<TouchableOpacity
+					onPress={() => handleDelete(item.id!)}
+					style={styles.deleteBtn}
+				>
+					<Ionicons name="trash-outline" size={24} color={colors.DANGER} />
+				</TouchableOpacity>
+			</TouchableOpacity>
+		</Animated.View>
 	);
 
 	if (loading) {
 		return (
-			<View style={styles.center}>
+			<View style={styles.centerContent}>
 				<ActivityIndicator size="large" color={colors.PRIMARY_PURPLE} />
-				<Text style={styles.loadingText}>Memuat todos...</Text>
+				<Text style={styles.loadingText}>Memuat To-Do...</Text>
+			</View>
+		);
+	}
+
+	if (error) {
+		// ... (error state code)
+		return (
+			<View style={styles.centerContent}>
+				<Ionicons name="alert-circle-outline" size={80} color={colors.DANGER} />
+				<Text style={styles.errorText}>{error}</Text>
+				<TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
+					<Text style={styles.retryText}>Coba Lagi</Text>
+				</TouchableOpacity>
 			</View>
 		);
 	}
 
 	return (
-		<GestureHandlerRootView style={{ flex: 1 }}>
-			<View style={styles.container}>
-				<DraggableFlatList
-					data={todos}
-					keyExtractor={(item) => item.id!}
-					renderItem={renderTodo}
-					onDragEnd={({ data }) => {
-						data.forEach((todo) => {
-							if (todo.id) {
-								updateTodo(user!.uid, todo.id, { updatedAt: new Date() });
-							}
-						});
-						setTodos(data);
-					}}
-					refreshControl={
-						<RefreshControl
-							refreshing={refreshing}
-							onRefresh={onRefresh}
-							colors={[colors.PRIMARY_PURPLE]}
+		<View style={styles.container}>
+			<FlatList
+				data={todos}
+				keyExtractor={(item) => item.id!}
+				renderItem={renderTodo}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						colors={[colors.PRIMARY_PURPLE]}
+					/>
+				}
+				contentContainerStyle={{ paddingBottom: 100, paddingTop: 6 }}
+				ListEmptyComponent={
+					<View style={styles.emptyContainer}>
+						<Ionicons
+							name="checkmark-done-circle-outline"
+							size={100}
+							color={colors.DIVIDER}
 						/>
-					}
-					contentContainerStyle={{ paddingBottom: 100 }}
-				/>
+						<Text style={styles.emptyTitle}>Belum ada To-Do</Text>
+						<Text style={styles.emptySubtitle}>
+							Tekan tombol + untuk membuat To-Do pertama Anda
+						</Text>
+					</View>
+				}
+			/>
 
-				<TouchableOpacity
-					style={styles.fab}
-					onPress={() => navigation.navigate("AddTodo" as never)}
-				>
-					<Ionicons name="add" size={30} color={colors.WHITE} />
-				</TouchableOpacity>
-			</View>
-		</GestureHandlerRootView>
+			{/* FAB (Floating Action Button) */}
+			<TouchableOpacity
+				style={styles.addBtn}
+				onPress={() => navigation.navigate("AddTodo" as never)}
+			>
+				<Ionicons name="add" size={30} color={colors.WHITE} />
+			</TouchableOpacity>
+		</View>
 	);
 }
+
+// ... kode styles (tetap sama) ...
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		paddingVertical: 20,
 		backgroundColor: colors.BACKGROUND,
 	},
-	center: {
+	centerContent: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
+		padding: 20,
 	},
-	loadingText: {
-		marginTop: 16,
-		color: colors.TEXT_GREY,
-		fontSize: 16,
-	},
-	card: {
+	noteCard: {
+		backgroundColor: colors.WHITE,
 		padding: 16,
-		borderRadius: 12,
+		paddingLeft: 60,
 		marginHorizontal: 12,
 		marginVertical: 6,
-		elevation: 2,
+		borderRadius: 12,
 		shadowColor: colors.SHADOW,
-		shadowOpacity: 0.1,
-		shadowOffset: { width: 0, height: 1 },
-		shadowRadius: 3,
+		shadowOpacity: 0.08,
+		shadowRadius: 8,
+		elevation: 3,
+		position: "relative",
+	},
+	contentContainer: {
+		// Konten utama
 	},
 	title: {
 		fontSize: 18,
 		fontWeight: "bold",
-		marginBottom: 6,
 		color: colors.TEXT_DARK,
+		marginBottom: 4,
 	},
-	row: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginTop: 3,
-	},
-	taskText: {
-		marginLeft: 8,
+	description: {
 		fontSize: 14,
-		color: colors.TEXT_DARK,
+		color: colors.TEXT_GREY,
+		lineHeight: 20,
+		marginBottom: 4,
 	},
 	date: {
-		marginTop: 8,
 		fontSize: 12,
 		color: colors.TEXT_LIGHT_GREY,
+		marginTop: 4,
 	},
-	fab: {
+	titleChecked: {
+		textDecorationLine: "line-through",
+		color: colors.TEXT_LIGHT_GREY,
+	},
+	descriptionChecked: {
+		textDecorationLine: "line-through",
+		color: colors.TEXT_LIGHT_GREY,
+	},
+
+	checkButton: {
+		position: "absolute",
+		left: 10,
+		top: 22,
+		padding: 5,
+		zIndex: 10,
+	},
+
+	deleteBtn: {
+		position: "absolute",
+		right: 12,
+		top: 12,
+		padding: 4,
+	},
+
+	addBtn: {
 		position: "absolute",
 		bottom: 30,
 		right: 20,
@@ -220,13 +316,46 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.4,
 		shadowRadius: 5,
 	},
-	deleteAction: {
-		backgroundColor: colors.DANGER,
+	emptyContainer: {
+		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		width: 80,
-		marginVertical: 6,
-		borderRadius: 12,
-		marginRight: 12,
+		paddingHorizontal: 40,
+		paddingVertical: 160,
+	},
+	emptyTitle: {
+		fontSize: 22,
+		fontWeight: "bold",
+		color: colors.TEXT_DARK,
+		marginTop: 20,
+		marginBottom: 8,
+	},
+	emptySubtitle: {
+		fontSize: 16,
+		color: colors.TEXT_GREY,
+		textAlign: "center",
+		marginBottom: 30,
+	},
+	errorText: {
+		color: colors.DANGER,
+		fontSize: 16,
+		textAlign: "center",
+		marginBottom: 16,
+	},
+	retryButton: {
+		backgroundColor: colors.FAB_BG,
+		paddingHorizontal: 24,
+		paddingVertical: 12,
+		borderRadius: 8,
+	},
+	retryText: {
+		color: colors.WHITE,
+		fontSize: 16,
+		fontWeight: "600",
+	},
+	loadingText: {
+		marginTop: 16,
+		color: colors.TEXT_GREY,
+		fontSize: 16,
 	},
 });

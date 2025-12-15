@@ -10,6 +10,8 @@ import {
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
+  Dimensions,
   FlatList,
   Modal,
   RefreshControl,
@@ -22,8 +24,8 @@ import {
 
 import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
-// Pastikan toggleFavoriteNote sudah dibuat di lib/notes.ts sesuai langkah 1
 import {
+  deleteMultipleNotes,
   deleteNote,
   getUserNotes,
   Note,
@@ -38,44 +40,94 @@ function NotesScreen({}: NotesScreenProps) {
   const { user } = useAuth();
   const navigation = useNavigation<NotesScreenProps["navigation"]>();
 
-  // === STATE ===
+  // === STATE DATA ===
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter, Search, Sort
+  // === STATE FILTER & SORT & VIEW ===
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [showSortMenu, setShowSortMenu] = useState(false);
-
-  // State Baru: Menampilkan Hanya Favorite
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
-  // === HEADER BUTTONS ===
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={{ flexDirection: "row", gap: 15, marginRight: 15 }}>
-          {/* 1. Tombol Filter Favorite (Header) */}
-          <TouchableOpacity
-            onPress={() => setShowFavoritesOnly((prev) => !prev)}
-          >
-            <Ionicons
-              name={showFavoritesOnly ? "heart" : "heart-outline"}
-              size={24}
-              color={showFavoritesOnly ? colors.DANGER : colors.PRIMARY_PURPLE}
-            />
-          </TouchableOpacity>
+  // State Tampilan: True = Grid (2 Kolom), False = List (1 Kolom)
+  const [isGridView, setIsGridView] = useState(true);
 
-          {/* 2. Tombol Filter Sort */}
-          <TouchableOpacity onPress={() => setShowSortMenu(true)}>
-            <Ionicons name="filter" size={24} color={colors.PRIMARY_PURPLE} />
+  // === STATE SELECTION MODE ===
+  const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
+  const isSelectionMode = selectedNotes.length > 0;
+
+  // === HEADER LOGIC ===
+  useLayoutEffect(() => {
+    if (isSelectionMode) {
+      navigation.setOptions({
+        title: `${selectedNotes.length} Dipilih`,
+        headerLeft: () => (
+          <TouchableOpacity
+            onPress={cancelSelection}
+            style={{ marginLeft: 15 }}
+          >
+            <Ionicons name="close" size={24} color={colors.TEXT_DARK} />
           </TouchableOpacity>
-        </View>
-      ),
-    });
-  }, [navigation, showFavoritesOnly]); // Update header saat state berubah
+        ),
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={handleDeleteSelected}
+            style={{ marginRight: 15 }}
+          >
+            <Ionicons name="trash" size={24} color={colors.DANGER} />
+          </TouchableOpacity>
+        ),
+      });
+    } else {
+      navigation.setOptions({
+        title: "Catatan",
+        headerLeft: undefined,
+        headerRight: () => (
+          <View style={{ flexDirection: "row", gap: 15, marginRight: 15 }}>
+            <TouchableOpacity
+              onPress={() => setShowFavoritesOnly((prev) => !prev)}
+            >
+              <Ionicons
+                name={showFavoritesOnly ? "heart" : "heart-outline"}
+                size={24}
+                color={
+                  showFavoritesOnly ? colors.DANGER : colors.PRIMARY_PURPLE
+                }
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setShowSortMenu(true)}>
+              <Ionicons name="filter" size={24} color={colors.PRIMARY_PURPLE} />
+            </TouchableOpacity>
+          </View>
+        ),
+      });
+    }
+  }, [
+    navigation,
+    isSelectionMode,
+    selectedNotes,
+    showFavoritesOnly,
+    isGridView,
+  ]);
+
+  useEffect(() => {
+    const backAction = () => {
+      if (isSelectionMode) {
+        cancelSelection();
+        return true;
+      }
+      return false;
+    };
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction
+    );
+    return () => backHandler.remove();
+  }, [isSelectionMode]);
 
   // === LOAD DATA ===
   const loadNotes = useCallback(async () => {
@@ -102,11 +154,84 @@ function NotesScreen({}: NotesScreenProps) {
     }
   }, [user?.uid, loadNotes]);
 
-  // === FUNGSI TOGGLE FAVORITE (AKSI KLIK LOVE DI KARTU) ===
+  // === LOGIKA INTERAKSI ===
+  const handleLongPress = (noteId: string) => {
+    if (!isSelectionMode) {
+      setSelectedNotes([noteId]);
+    }
+  };
+
+  const handlePressNote = (note: Note) => {
+    if (isSelectionMode) {
+      if (selectedNotes.includes(note.id)) {
+        const newSelection = selectedNotes.filter((id) => id !== note.id);
+        setSelectedNotes(newSelection);
+      } else {
+        setSelectedNotes([...selectedNotes, note.id]);
+      }
+    } else {
+      // @ts-ignore
+      navigation.navigate("EditNote", { noteId: note.id, note: note });
+    }
+  };
+
+  const cancelSelection = () => {
+    setSelectedNotes([]);
+  };
+
+  const handleDeleteSingle = async (id: string) => {
+    Alert.alert(
+      "Hapus Catatan",
+      "Apakah Anda yakin ingin menghapus catatan ini?",
+      [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Hapus",
+          style: "destructive",
+          onPress: async () => {
+            if (!user?.uid) return;
+            try {
+              await deleteNote(user.uid, id);
+              setNotes((prev) => prev.filter((n) => n.id !== id));
+            } catch (err: any) {
+              Alert.alert("Gagal", err.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteSelected = () => {
+    Alert.alert(
+      "Hapus Catatan",
+      `Yakin ingin menghapus ${selectedNotes.length} catatan ini?`,
+      [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Hapus",
+          style: "destructive",
+          onPress: async () => {
+            if (!user?.uid) return;
+            try {
+              await deleteMultipleNotes(user.uid, selectedNotes);
+              setNotes((prev) =>
+                prev.filter((n) => !selectedNotes.includes(n.id))
+              );
+              cancelSelection();
+            } catch (err: any) {
+              Alert.alert("Gagal", "Terjadi kesalahan saat menghapus.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleToggleFavorite = async (note: Note) => {
+    if (isSelectionMode) return;
     if (!user?.uid) return;
 
-    // 1. Update UI Optimistic (Langsung berubah biar cepat)
     const newStatus = !note.isFavorite;
     setNotes((prevNotes) =>
       prevNotes.map((n) =>
@@ -114,30 +239,21 @@ function NotesScreen({}: NotesScreenProps) {
       )
     );
 
-    // 2. Update ke Firebase di background
     try {
       await toggleFavoriteNote(user.uid, note.id, note.isFavorite || false);
     } catch (error) {
-      // Jika gagal, kembalikan UI ke semula
       setNotes((prevNotes) =>
         prevNotes.map((n) =>
           n.id === note.id ? { ...n, isFavorite: !newStatus } : n
         )
       );
-      Alert.alert("Error", "Gagal mengupdate favorite");
     }
   };
 
-  // === LOGIKA FILTER LENGKAP (SEARCH + FAVORITE + SORT) ===
   const filteredAndSortedNotes = useMemo(() => {
     let data = [...notes];
-
-    // A. Filter Favorite Only
-    if (showFavoritesOnly) {
+    if (showFavoritesOnly)
       data = data.filter((note) => note.isFavorite === true);
-    }
-
-    // B. Filter Search
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       data = data.filter(
@@ -146,8 +262,6 @@ function NotesScreen({}: NotesScreenProps) {
           note.content.toLowerCase().includes(lowerQuery)
       );
     }
-
-    // C. Sorting
     switch (sortOption) {
       case "newest":
         return data.sort((a, b) => b.updatedAt.seconds - a.updatedAt.seconds);
@@ -167,71 +281,76 @@ function NotesScreen({}: NotesScreenProps) {
     loadNotes();
   }, [loadNotes]);
 
-  const handleDelete = async (id: string) => {
-    if (!user?.uid) return;
-    try {
-      await deleteNote(user.uid, id);
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-    } catch (err: any) {
-      Alert.alert("Gagal", err.message);
-    }
+  // === RENDER ITEM ===
+  const renderNote = ({ item }: { item: Note }) => {
+    const isSelected = selectedNotes.includes(item.id);
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.noteCard,
+          isGridView ? styles.cardGrid : styles.cardList,
+          isSelected && styles.selectedCard,
+        ]}
+        onLongPress={() => handleLongPress(item.id)}
+        onPress={() => handlePressNote(item)}
+        activeOpacity={0.7}
+      >
+        {isSelectionMode && (
+          <View style={styles.selectionOverlay}>
+            <Ionicons
+              name={isSelected ? "checkbox" : "square-outline"}
+              size={24}
+              color={
+                isSelected ? colors.PRIMARY_PURPLE : colors.TEXT_LIGHT_GREY
+              }
+            />
+          </View>
+        )}
+
+        <View style={styles.cardHeader}>
+          <Text style={styles.title} numberOfLines={1}>
+            {item.title}
+          </Text>
+          {!isSelectionMode && (
+            <TouchableOpacity onPress={() => handleToggleFavorite(item)}>
+              <Ionicons
+                name={item.isFavorite ? "heart" : "heart-outline"}
+                size={20}
+                color={item.isFavorite ? colors.DANGER : colors.TEXT_LIGHT_GREY}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <Text style={styles.description} numberOfLines={isGridView ? 5 : 2}>
+          {item.content}
+        </Text>
+
+        <View style={styles.cardFooter}>
+          {/* === UPDATE FORMAT TANGGAL DI SINI === */}
+          <Text style={styles.date}>
+            {new Date(item.updatedAt.seconds * 1000).toLocaleString("id-ID", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </Text>
+
+          {!isSelectionMode && (
+            <TouchableOpacity
+              onPress={() => handleDeleteSingle(item.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.DANGER} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
   };
-
-  const renderNote = ({ item }: { item: Note }) => (
-    <TouchableOpacity
-      style={styles.noteCard}
-      onPress={() => {
-        // @ts-ignore
-        navigation.navigate("EditNote", { noteId: item.id, note: item });
-      }}
-    >
-      <View style={styles.cardHeader}>
-        <Text style={styles.title} numberOfLines={1}>
-          {item.title}
-        </Text>
-
-        {/* TOMBOL LOVE DI KARTU */}
-        <TouchableOpacity onPress={() => handleToggleFavorite(item)}>
-          <Ionicons
-            name={item.isFavorite ? "heart" : "heart-outline"}
-            size={22}
-            color={item.isFavorite ? colors.DANGER : colors.TEXT_LIGHT_GREY}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.description}>
-        {item.content.length > 100
-          ? `${item.content.substring(0, 100)}...`
-          : item.content}
-      </Text>
-
-      <View style={styles.cardFooter}>
-        <Text style={styles.date}>
-          {new Date(item.updatedAt.seconds * 1000).toLocaleDateString("id-ID", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })}
-        </Text>
-        <TouchableOpacity
-          onPress={() =>
-            Alert.alert("Hapus", "Yakin hapus?", [
-              { text: "Batal", style: "cancel" },
-              {
-                text: "Hapus",
-                style: "destructive",
-                onPress: () => handleDelete(item.id),
-              },
-            ])
-          }
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="trash-outline" size={20} color={colors.DANGER} />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
 
   if (loading)
     return (
@@ -242,34 +361,52 @@ function NotesScreen({}: NotesScreenProps) {
 
   return (
     <View style={styles.container}>
-      {/* SEARCH BAR */}
-      <View style={styles.searchContainer}>
-        <Ionicons
-          name="search"
-          size={20}
-          color={colors.TEXT_GREY}
-          style={{ marginRight: 8 }}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={
-            showFavoritesOnly ? "Cari di favorite..." : "Cari judul atau isi..."
-          }
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor={colors.TEXT_LIGHT_GREY}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery("")}>
-            <Ionicons name="close-circle" size={20} color={colors.TEXT_GREY} />
-          </TouchableOpacity>
-        )}
+      {/* === HEADER ROW === */}
+      <View style={styles.headerRow}>
+        <View
+          style={[styles.searchContainer, isSelectionMode && { opacity: 0.5 }]}
+        >
+          <Ionicons
+            name="search"
+            size={20}
+            color={colors.TEXT_GREY}
+            style={{ marginRight: 8 }}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={showFavoritesOnly ? "Cari di favorite..." : "Cari..."}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={colors.TEXT_LIGHT_GREY}
+            editable={!isSelectionMode}
+          />
+          {searchQuery.length > 0 && !isSelectionMode && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={colors.TEXT_GREY}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.viewToggleBtn, isSelectionMode && { opacity: 0.5 }]}
+          onPress={() => !isSelectionMode && setIsGridView((prev) => !prev)}
+          disabled={isSelectionMode}
+        >
+          <Ionicons
+            name={isGridView ? "list" : "grid-outline"}
+            size={22}
+            color={colors.PRIMARY_PURPLE}
+          />
+        </TouchableOpacity>
       </View>
 
-      {/* INFO BAR: JIKA MODE FAVORITE AKTIF */}
       {showFavoritesOnly && (
         <View style={styles.filterInfo}>
-          <Text style={styles.filterInfoText}>Menampilkan Favorite</Text>
+          <Text style={styles.filterInfoText}>❤️ Favorite</Text>
           <TouchableOpacity onPress={() => setShowFavoritesOnly(false)}>
             <Text style={styles.clearFilterText}>Reset</Text>
           </TouchableOpacity>
@@ -277,40 +414,36 @@ function NotesScreen({}: NotesScreenProps) {
       )}
 
       <FlatList
+        key={isGridView ? "grid" : "list"}
+        numColumns={isGridView ? 2 : 1}
+        columnWrapperStyle={isGridView ? styles.row : undefined}
         data={filteredAndSortedNotes}
         renderItem={renderNote}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 12 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons
-              name={
-                showFavoritesOnly ? "heart-dislike-outline" : "document-outline"
-              }
-              size={80}
+              name="document-outline"
+              size={60}
               color={colors.DIVIDER}
             />
-            <Text style={styles.emptyTitle}>
-              {showFavoritesOnly ? "Tidak ada favorite" : "Belum ada catatan"}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {showFavoritesOnly
-                ? "Tandai catatan dengan ❤️ untuk melihatnya di sini"
-                : "Tekan tombol + untuk membuat catatan baru"}
-            </Text>
+            <Text style={styles.emptyTitle}>Kosong</Text>
           </View>
         }
       />
 
-      <TouchableOpacity
-        style={styles.addBtn}
-        onPress={() => navigation.navigate("AddNote" as never)}
-      >
-        <Ionicons name="add" size={30} color={colors.WHITE} />
-      </TouchableOpacity>
+      {!isSelectionMode && (
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => navigation.navigate("AddNote" as never)}
+        >
+          <Ionicons name="add" size={30} color={colors.WHITE} />
+        </TouchableOpacity>
+      )}
 
       {/* MODAL SORT */}
       <Modal
@@ -326,7 +459,6 @@ function NotesScreen({}: NotesScreenProps) {
         >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Urutkan Catatan</Text>
-
             <TouchableOpacity
               style={styles.modalOption}
               onPress={() => {
@@ -345,7 +477,6 @@ function NotesScreen({}: NotesScreenProps) {
               />
               <Text style={styles.optionText}>Terbaru</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.modalOption}
               onPress={() => {
@@ -364,7 +495,6 @@ function NotesScreen({}: NotesScreenProps) {
               />
               <Text style={styles.optionText}>Terlama</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.modalOption}
               onPress={() => {
@@ -381,7 +511,6 @@ function NotesScreen({}: NotesScreenProps) {
               />
               <Text style={styles.optionText}>A-Z</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.modalOption}
               onPress={() => {
@@ -407,17 +536,26 @@ function NotesScreen({}: NotesScreenProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.BACKGROUND },
+
+  // Header Row
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    marginTop: 12,
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.WHITE,
-    margin: 16,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    height: 48,
-    borderRadius: 12,
+    height: 45,
+    borderRadius: 25,
     borderWidth: 1,
     borderColor: colors.DIVIDER,
+    paddingHorizontal: 12,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
@@ -426,7 +564,17 @@ const styles = StyleSheet.create({
     color: colors.TEXT_DARK,
   },
 
-  // Info Bar Style (New)
+  viewToggleBtn: {
+    width: 45,
+    height: 45,
+    backgroundColor: colors.WHITE,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.DIVIDER,
+  },
+
   filterInfo: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -453,48 +601,73 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 
-  // Card Style Updated
+  // Note Card
   noteCard: {
     backgroundColor: colors.WHITE,
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 6,
+    padding: 12,
     borderRadius: 12,
     shadowColor: colors.SHADOW,
     shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 5,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "transparent",
   },
+  cardGrid: {
+    width: Dimensions.get("window").width / 2 - 18,
+    flexGrow: 0,
+    minHeight: 120,
+    marginBottom: 0,
+  },
+  cardList: {
+    width: "100%",
+    marginBottom: 10,
+    minHeight: 80,
+  },
+  row: {
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  selectedCard: {
+    backgroundColor: "#F3E5F5",
+    borderColor: colors.PRIMARY_PURPLE,
+  },
+  selectionOverlay: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    zIndex: 10,
+  },
+
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Poppins-Bold",
     color: colors.TEXT_DARK,
     flex: 1,
-    marginRight: 10,
+    marginRight: 5,
   },
-
   description: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: "Poppins-Regular",
     color: colors.TEXT_GREY,
-    lineHeight: 20,
+    lineHeight: 18,
     marginBottom: 10,
   },
-
   cardFooter: {
+    marginTop: "auto",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 5,
   },
   date: {
-    fontSize: 12,
+    fontSize: 10,
     fontFamily: "Poppins-Regular",
     color: colors.TEXT_LIGHT_GREY,
   },
@@ -504,9 +677,9 @@ const styles = StyleSheet.create({
     bottom: 30,
     right: 20,
     backgroundColor: colors.FAB_BG,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
     elevation: 6,
@@ -523,20 +696,12 @@ const styles = StyleSheet.create({
     paddingVertical: 100,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Poppins-Bold",
     color: colors.TEXT_DARK,
     marginTop: 20,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    fontFamily: "Poppins-Regular",
-    color: colors.TEXT_GREY,
-    textAlign: "center",
   },
 
-  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

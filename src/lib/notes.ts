@@ -5,13 +5,13 @@ import {
   collection,
   deleteDoc,
   doc,
-  getDoc,
   getDocs,
   orderBy,
   query,
   serverTimestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 
 export type Note = {
@@ -19,8 +19,8 @@ export type Note = {
   title: string;
   content: string;
   userId: string;
-  imageUrl?: string | null; // <--- Saya rapikan biar konsisten
-  isFavorite?: boolean; // <--- TAMBAHAN BARU
+  imageUrl?: string | null;
+  isFavorite?: boolean;
   createdAt: any;
   updatedAt: any;
 };
@@ -32,7 +32,7 @@ export const createNote = async (
   userId: string,
   title: string,
   content: string,
-  imageUrl: string | null = null // Opsional
+  imageUrl: string | null = null
 ): Promise<string> => {
   if (!userId) throw new Error("userId diperlukan");
 
@@ -41,7 +41,7 @@ export const createNote = async (
     content: content.trim(),
     userId,
     imageUrl: imageUrl,
-    isFavorite: false, // Default: Tidak favorite
+    isFavorite: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -49,7 +49,7 @@ export const createNote = async (
   return docRef.id;
 };
 
-// === READ ALL (milik user) ===
+// === READ ALL ===
 export const getUserNotes = async (userId: string): Promise<Note[]> => {
   if (!userId) {
     throw new Error("userId diperlukan");
@@ -73,23 +73,6 @@ export const getUserNotes = async (userId: string): Promise<Note[]> => {
   }
 };
 
-// === READ ONE ===
-export const getNoteById = async (
-  userId: string,
-  noteId: string
-): Promise<Note | null> => {
-  if (!userId) throw new Error("userId diperlukan");
-
-  const docRef = doc(db, NOTES_COLLECTION, noteId);
-  const docSnap = await getDoc(docRef);
-
-  if (!docSnap.exists()) return null;
-  const data = docSnap.data();
-  if (data.userId !== userId) throw new Error("Akses ditolak");
-
-  return { id: docSnap.id, ...data } as Note;
-};
-
 // === UPDATE ===
 export const updateNote = async (
   userId: string,
@@ -99,68 +82,63 @@ export const updateNote = async (
   if (!userId) throw new Error("userId diperlukan");
 
   const docRef = doc(db, NOTES_COLLECTION, noteId);
-  const docSnap = await getDoc(docRef);
-
-  if (!docSnap.exists()) throw new Error("Catatan tidak ditemukan");
-  if (docSnap.data().userId !== userId) throw new Error("Akses ditolak");
-
   await updateDoc(docRef, {
     ...updates,
     updatedAt: serverTimestamp(),
   });
 };
 
-// === TOGGLE FAVORITE (BARU) ===
+// === TOGGLE FAVORITE ===
 export const toggleFavoriteNote = async (
   userId: string,
   noteId: string,
   currentStatus: boolean
 ): Promise<void> => {
   if (!userId) throw new Error("userId diperlukan");
-
   const docRef = doc(db, NOTES_COLLECTION, noteId);
-
-  // Validasi pemilik (agar aman)
-  const docSnap = await getDoc(docRef);
-  if (!docSnap.exists()) throw new Error("Catatan tidak ditemukan");
-  if (docSnap.data().userId !== userId) throw new Error("Akses ditolak");
-
-  // Update status favorite
   await updateDoc(docRef, {
     isFavorite: !currentStatus,
     updatedAt: serverTimestamp(),
   });
 };
 
-// === DELETE ===
+// === DELETE SINGLE ===
 export const deleteNote = async (
   userId: string,
   noteId: string
 ): Promise<void> => {
-  if (!userId) {
-    throw new Error("userId diperlukan");
-  }
-
+  if (!userId) throw new Error("userId diperlukan");
   const docRef = doc(db, "notes", noteId);
-  const docSnap = await getDoc(docRef);
-
-  if (!docSnap.exists()) {
-    throw new Error("Catatan tidak ditemukan");
-  }
-  if (docSnap.data().userId !== userId) {
-    throw new Error("Akses ditolak");
-  }
-
   await deleteDoc(docRef);
 };
 
-// === INTERFACE BAWAAN (Update) ===
+// === DELETE MULTIPLE (BATCH) - INI YANG ANDA BUTUHKAN ===
+export const deleteMultipleNotes = async (
+  userId: string,
+  noteIds: string[]
+): Promise<void> => {
+  if (!userId) throw new Error("userId diperlukan");
+  if (noteIds.length === 0) return;
+
+  // Menggunakan Batch untuk menghapus banyak sekaligus
+  const batch = writeBatch(db);
+
+  noteIds.forEach((id) => {
+    const docRef = doc(db, "notes", id);
+    batch.delete(docRef);
+  });
+
+  // Jalankan semua perintah hapus
+  await batch.commit();
+};
+
+// === INTERFACE ADD NOTE ===
 export interface NoteData {
   title: string;
   content: string;
   userId: string;
   imageUrl?: string | null;
-  isFavorite?: boolean; // <--- Tambah ini
+  isFavorite?: boolean;
 }
 
 export const addNote = async (data: NoteData) => {
@@ -168,7 +146,7 @@ export const addNote = async (data: NoteData) => {
     await addDoc(collection(db, "notes"), {
       ...data,
       imageUrl: data.imageUrl || null,
-      isFavorite: data.isFavorite || false, // Default false
+      isFavorite: data.isFavorite || false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

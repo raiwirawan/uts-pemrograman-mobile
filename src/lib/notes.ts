@@ -13,11 +13,13 @@ import {
 	updateDoc,
 	where,
 } from "firebase/firestore";
+import { deleteNoteImage } from "./storage";
 
 export type Note = {
 	id: string;
 	title: string;
-	content: string; // ← TAMBAH INI
+	content: string;
+	imageUrl?: string; // ← TAMBAH INI untuk menyimpan URL gambar
 	userId: string;
 	createdAt: any;
 	updatedAt: any;
@@ -29,13 +31,15 @@ const NOTES_COLLECTION = "notes";
 export const createNote = async (
 	userId: string,
 	title: string,
-	content: string
+	content: string,
+	imageUrl?: string // ← TAMBAH PARAMETER
 ): Promise<string> => {
 	if (!userId) throw new Error("userId diperlukan");
 
 	const docRef = await addDoc(collection(db, NOTES_COLLECTION), {
 		title: title.trim(),
 		content: content.trim(),
+		imageUrl: imageUrl || null, // ← SIMPAN URL
 		userId,
 		createdAt: serverTimestamp(),
 		updatedAt: serverTimestamp(),
@@ -89,7 +93,7 @@ export const getNoteById = async (
 export const updateNote = async (
 	userId: string,
 	noteId: string,
-	updates: { title?: string; content?: string }
+	updates: { title?: string; content?: string; imageUrl?: string | null } // ← TAMBAH imageUrl
 ): Promise<void> => {
 	if (!userId) throw new Error("userId diperlukan");
 
@@ -106,7 +110,6 @@ export const updateNote = async (
 };
 
 // === DELETE ===
-
 export const deleteNote = async (
 	userId: string,
 	noteId: string
@@ -123,6 +126,17 @@ export const deleteNote = async (
 	}
 	if (docSnap.data().userId !== userId) {
 		throw new Error("Akses ditolak");
+	}
+
+	// Delete associated image if exists
+	const noteData = docSnap.data();
+	if (noteData.imageUrl) {
+		try {
+			await deleteNoteImage(noteData.imageUrl);
+		} catch (error) {
+			console.error("Failed to delete image:", error);
+			// Continue with note deletion even if image deletion fails
+		}
 	}
 
 	await deleteDoc(docRef);

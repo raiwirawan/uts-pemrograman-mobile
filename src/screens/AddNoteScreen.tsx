@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
+	Image,
 	KeyboardAvoidingView,
 	Platform,
 	ScrollView,
@@ -18,6 +19,7 @@ import {
 import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
 import { createNote } from "@/lib/notes";
+import { pickImage, takePhoto, uploadNoteImage } from "@/lib/storage";
 import { AddNoteScreenProps } from "@/types/navigation";
 
 // eslint-disable-next-line no-empty-pattern
@@ -27,7 +29,9 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 
 	const [title, setTitle] = useState("");
 	const [content, setContent] = useState("");
+	const [imageUri, setImageUri] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
+	const [uploading, setUploading] = useState(false);
 	const [hasChanges, setHasChanges] = useState(false);
 
 	// === BACK HANDLER: CONFIRM UNSAVED CHANGES ===
@@ -53,6 +57,71 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 		return unsubscribe;
 	}, [navigation, hasChanges, saving]);
 
+	// === PICK IMAGE FROM GALLERY ===
+	const handlePickImage = async () => {
+		try {
+			setUploading(true);
+			const uri = await pickImage();
+			if (uri) {
+				setImageUri(uri);
+				setHasChanges(true);
+			}
+		} catch (error: any) {
+			Alert.alert("Error", error.message);
+		} finally {
+			setUploading(false);
+		}
+	};
+
+	// === TAKE PHOTO WITH CAMERA ===
+	const handleTakePhoto = async () => {
+		try {
+			setUploading(true);
+			const uri = await takePhoto();
+			if (uri) {
+				setImageUri(uri);
+				setHasChanges(true);
+			}
+		} catch (error: any) {
+			Alert.alert("Error", error.message);
+		} finally {
+			setUploading(false);
+		}
+	};
+
+	// === REMOVE IMAGE ===
+	const handleRemoveImage = () => {
+		Alert.alert("Hapus Gambar", "Yakin ingin menghapus gambar ini?", [
+			{ text: "Batal", style: "cancel" },
+			{
+				text: "Hapus",
+				style: "destructive",
+				onPress: () => {
+					setImageUri(null);
+					setHasChanges(true);
+				},
+			},
+		]);
+	};
+
+	// === SHOW IMAGE OPTIONS ===
+	const showImageOptions = () => {
+		Alert.alert("Tambah Gambar", "Pilih sumber gambar", [
+			{
+				text: "Kamera",
+				onPress: handleTakePhoto,
+			},
+			{
+				text: "Galeri",
+				onPress: handlePickImage,
+			},
+			{
+				text: "Batal",
+				style: "cancel",
+			},
+		]);
+	};
+
 	// === SAVE NOTE ===
 	const handleSave = async () => {
 		if (!title.trim() || !content.trim()) {
@@ -67,7 +136,46 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 
 		setSaving(true);
 		try {
-			await createNote(user.uid, title.trim(), content.trim());
+			let uploadedImageUrl: string | undefined;
+
+			// Upload image if exists
+			if (imageUri) {
+				try {
+					// Create temporary noteId for upload
+					const tempNoteId = `temp_${Date.now()}`;
+					uploadedImageUrl = await uploadNoteImage(
+						user.uid,
+						tempNoteId,
+						imageUri
+					);
+				} catch (uploadError: any) {
+					Alert.alert(
+						"Peringatan",
+						`Gambar gagal diupload: ${uploadError.message}. Lanjutkan tanpa gambar?`,
+						[
+							{ text: "Batal", style: "cancel" },
+							{
+								text: "Lanjutkan",
+								onPress: async () => {
+									await createNote(user.uid, title.trim(), content.trim());
+									setHasChanges(false);
+									navigation.goBack();
+								},
+							},
+						]
+					);
+					setSaving(false);
+					return;
+				}
+			}
+
+			// Create note with image URL
+			await createNote(
+				user.uid,
+				title.trim(),
+				content.trim(),
+				uploadedImageUrl
+			);
 			setHasChanges(false);
 			navigation.goBack();
 		} catch (err: any) {
@@ -83,7 +191,6 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 			style={styles.container}
 			keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 50}
 		>
-			{/* SCROLL CONTENT */}
 			<ScrollView
 				style={styles.scrollView}
 				contentContainerStyle={styles.scrollContent}
@@ -103,6 +210,39 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 					}}
 				/>
 
+				{/* GAMBAR SECTION */}
+				<Text style={styles.label}>Gambar (Opsional)</Text>
+				{imageUri ? (
+					<View style={styles.imageContainer}>
+						<Image source={{ uri: imageUri }} style={styles.imagePreview} />
+						<TouchableOpacity
+							style={styles.removeImageBtn}
+							onPress={handleRemoveImage}
+						>
+							<Ionicons name="close-circle" size={32} color={colors.DANGER} />
+						</TouchableOpacity>
+					</View>
+				) : (
+					<TouchableOpacity
+						style={styles.addImageBtn}
+						onPress={showImageOptions}
+						disabled={uploading}
+					>
+						{uploading ? (
+							<ActivityIndicator color={colors.PRIMARY_PURPLE} />
+						) : (
+							<>
+								<Ionicons
+									name="image-outline"
+									size={32}
+									color={colors.PRIMARY_PURPLE}
+								/>
+								<Text style={styles.addImageText}>Tambah Gambar</Text>
+							</>
+						)}
+					</TouchableOpacity>
+				)}
+
 				{/* ISI CATATAN */}
 				<Text style={styles.label}>Isi Catatan</Text>
 				<TextInput
@@ -119,7 +259,7 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 				/>
 			</ScrollView>
 
-			{/* FOOTER — SAMA PERSIS DENGAN EDITNOTE */}
+			{/* FOOTER */}
 			<View style={styles.footer}>
 				<View style={styles.buttonRow}>
 					<TouchableOpacity
@@ -143,10 +283,6 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 }
 
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: colors.WHITE,
-	},
 	container: {
 		flex: 1,
 	},
@@ -174,6 +310,42 @@ const styles = StyleSheet.create({
 		marginBottom: 20,
 		backgroundColor: colors.CARD_BG,
 	},
+	imageContainer: {
+		position: "relative",
+		marginBottom: 20,
+		borderRadius: 12,
+		overflow: "hidden",
+	},
+	imagePreview: {
+		width: "100%",
+		height: 200,
+		borderRadius: 12,
+		backgroundColor: colors.DIVIDER,
+	},
+	removeImageBtn: {
+		position: "absolute",
+		top: 8,
+		right: 8,
+		backgroundColor: colors.WHITE,
+		borderRadius: 16,
+	},
+	addImageBtn: {
+		height: 120,
+		borderWidth: 2,
+		borderStyle: "dashed",
+		borderColor: colors.PRIMARY_PURPLE,
+		borderRadius: 12,
+		justifyContent: "center",
+		alignItems: "center",
+		marginBottom: 20,
+		backgroundColor: colors.CARD_BG,
+		gap: 8,
+	},
+	addImageText: {
+		color: colors.PRIMARY_PURPLE,
+		fontSize: 16,
+		fontWeight: "600",
+	},
 	contentInput: {
 		fontSize: 16,
 		padding: 16,
@@ -184,7 +356,6 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.CARD_BG,
 		lineHeight: 24,
 	},
-	// FOOTER — 100% SAMA DENGAN EDITNOTE
 	footer: {
 		paddingHorizontal: 20,
 		paddingVertical: 16,
@@ -203,7 +374,7 @@ const styles = StyleSheet.create({
 		gap: 12,
 	},
 	saveBtn: {
-		flex: 2,
+		flex: 1,
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",

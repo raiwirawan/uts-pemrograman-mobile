@@ -1,9 +1,11 @@
+// screens/EditNoteScreen.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
+	Image,
 	KeyboardAvoidingView,
 	Platform,
 	ScrollView,
@@ -17,6 +19,12 @@ import {
 import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
 import { deleteNote, updateNote } from "@/lib/notes";
+import {
+	deleteNoteImage,
+	pickImage,
+	takePhoto,
+	uploadNoteImage,
+} from "@/lib/storage";
 import { EditNoteScreenProps } from "@/types/navigation";
 
 // eslint-disable-next-line no-empty-pattern
@@ -37,8 +45,15 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 
 	const [title, setTitle] = useState(note?.title ?? "");
 	const [content, setContent] = useState(note?.content ?? "");
+	const [imageUri, setImageUri] = useState<string | null>(
+		note?.imageUrl ?? null
+	);
+	const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(
+		note?.imageUrl ?? null
+	);
 	const [saving, setSaving] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const [uploading, setUploading] = useState(false);
 	const [hasChanges, setHasChanges] = useState(false);
 
 	useEffect(() => {
@@ -61,6 +76,72 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 		return unsubscribe;
 	}, [navigation, hasChanges, saving, deleting]);
 
+	// === PICK IMAGE FROM GALLERY ===
+	const handlePickImage = async () => {
+		try {
+			setUploading(true);
+			const uri = await pickImage();
+			if (uri) {
+				setImageUri(uri);
+				setHasChanges(true);
+			}
+		} catch (error: any) {
+			Alert.alert("Error", error.message);
+		} finally {
+			setUploading(false);
+		}
+	};
+
+	// === TAKE PHOTO WITH CAMERA ===
+	const handleTakePhoto = async () => {
+		try {
+			setUploading(true);
+			const uri = await takePhoto();
+			if (uri) {
+				setImageUri(uri);
+				setHasChanges(true);
+			}
+		} catch (error: any) {
+			Alert.alert("Error", error.message);
+		} finally {
+			setUploading(false);
+		}
+	};
+
+	// === REMOVE IMAGE ===
+	const handleRemoveImage = () => {
+		Alert.alert("Hapus Gambar", "Yakin ingin menghapus gambar ini?", [
+			{ text: "Batal", style: "cancel" },
+			{
+				text: "Hapus",
+				style: "destructive",
+				onPress: () => {
+					setImageUri(null);
+					setHasChanges(true);
+				},
+			},
+		]);
+	};
+
+	// === SHOW IMAGE OPTIONS ===
+	const showImageOptions = () => {
+		Alert.alert("Tambah Gambar", "Pilih sumber gambar", [
+			{
+				text: "Kamera",
+				onPress: handleTakePhoto,
+			},
+			{
+				text: "Galeri",
+				onPress: handlePickImage,
+			},
+			{
+				text: "Batal",
+				style: "cancel",
+			},
+		]);
+	};
+
+	// === SAVE NOTE ===
 	const handleSave = async () => {
 		if (!title.trim() || !content.trim()) {
 			Alert.alert("Error", "Judul dan isi catatan wajib diisi");
@@ -70,10 +151,62 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 
 		setSaving(true);
 		try {
+			let uploadedImageUrl: string | null = imageUri;
+
+			// Check if image changed
+			const imageChanged = imageUri !== originalImageUrl;
+
+			if (imageChanged) {
+				// Delete old image if exists
+				if (originalImageUrl) {
+					try {
+						await deleteNoteImage(originalImageUrl);
+					} catch (error) {
+						console.error("Failed to delete old image:", error);
+					}
+				}
+
+				// Upload new image if exists and is local URI
+				if (imageUri && !imageUri.startsWith("http")) {
+					try {
+						uploadedImageUrl = await uploadNoteImage(
+							user.uid,
+							note.id,
+							imageUri
+						);
+					} catch (uploadError: any) {
+						Alert.alert(
+							"Peringatan",
+							`Gambar gagal diupload: ${uploadError.message}. Lanjutkan tanpa gambar baru?`,
+							[
+								{ text: "Batal", style: "cancel" },
+								{
+									text: "Lanjutkan",
+									onPress: async () => {
+										await updateNote(user.uid, note.id, {
+											title: title.trim(),
+											content: content.trim(),
+											imageUrl: null,
+										});
+										setHasChanges(false);
+										navigation.goBack();
+									},
+								},
+							]
+						);
+						setSaving(false);
+						return;
+					}
+				}
+			}
+
+			// Update note
 			await updateNote(user.uid, note.id, {
 				title: title.trim(),
 				content: content.trim(),
+				imageUrl: uploadedImageUrl,
 			});
+
 			setHasChanges(false);
 			navigation.goBack();
 		} catch (err: any) {
@@ -83,6 +216,7 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 		}
 	};
 
+	// === DELETE NOTE ===
 	const handleDelete = async () => {
 		if (!note?.id) return;
 		Alert.alert("Hapus Catatan", "Catatan ini akan dihapus permanen.", [
@@ -121,7 +255,6 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 			style={styles.container}
 			keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 50}
 		>
-			{/* SCROLL CONTENT */}
 			<ScrollView
 				style={styles.scrollView}
 				contentContainerStyle={styles.scrollContent}
@@ -141,6 +274,39 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 					}}
 				/>
 
+				{/* GAMBAR SECTION */}
+				<Text style={styles.label}>Gambar (Opsional)</Text>
+				{imageUri ? (
+					<View style={styles.imageContainer}>
+						<Image source={{ uri: imageUri }} style={styles.imagePreview} />
+						<TouchableOpacity
+							style={styles.removeImageBtn}
+							onPress={handleRemoveImage}
+						>
+							<Ionicons name="close-circle" size={32} color={colors.DANGER} />
+						</TouchableOpacity>
+					</View>
+				) : (
+					<TouchableOpacity
+						style={styles.addImageBtn}
+						onPress={showImageOptions}
+						disabled={uploading}
+					>
+						{uploading ? (
+							<ActivityIndicator color={colors.PRIMARY_PURPLE} />
+						) : (
+							<>
+								<Ionicons
+									name="image-outline"
+									size={32}
+									color={colors.PRIMARY_PURPLE}
+								/>
+								<Text style={styles.addImageText}>Tambah Gambar</Text>
+							</>
+						)}
+					</TouchableOpacity>
+				)}
+
 				{/* ISI CATATAN */}
 				<Text style={styles.label}>Isi Catatan</Text>
 				<TextInput
@@ -157,7 +323,7 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 				/>
 			</ScrollView>
 
-			{/* FOOTER — DI LUAR SCROLLVIEW, AMAN DARI KEYBOARD */}
+			{/* FOOTER */}
 			<View style={styles.footer}>
 				<View style={styles.buttonRow}>
 					<TouchableOpacity
@@ -196,10 +362,6 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 }
 
 const styles = StyleSheet.create({
-	safeArea: {
-		flex: 1,
-		backgroundColor: colors.WHITE,
-	},
 	container: {
 		flex: 1,
 		height: "100%",
@@ -212,7 +374,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		height: "100%",
 		padding: 20,
-		paddingBottom: 20, // Hanya sedikit, karena footer di luar
+		paddingBottom: 20,
 	},
 	label: {
 		fontSize: 14,
@@ -231,6 +393,42 @@ const styles = StyleSheet.create({
 		marginBottom: 20,
 		backgroundColor: colors.CARD_BG,
 	},
+	imageContainer: {
+		position: "relative",
+		marginBottom: 20,
+		borderRadius: 12,
+		overflow: "hidden",
+	},
+	imagePreview: {
+		width: "100%",
+		height: 200,
+		borderRadius: 12,
+		backgroundColor: colors.DIVIDER,
+	},
+	removeImageBtn: {
+		position: "absolute",
+		top: 8,
+		right: 8,
+		backgroundColor: colors.WHITE,
+		borderRadius: 16,
+	},
+	addImageBtn: {
+		height: 120,
+		borderWidth: 2,
+		borderStyle: "dashed",
+		borderColor: colors.PRIMARY_PURPLE,
+		borderRadius: 12,
+		justifyContent: "center",
+		alignItems: "center",
+		marginBottom: 20,
+		backgroundColor: colors.CARD_BG,
+		gap: 8,
+	},
+	addImageText: {
+		color: colors.PRIMARY_PURPLE,
+		fontSize: 16,
+		fontWeight: "600",
+	},
 	contentInput: {
 		fontSize: 16,
 		padding: 16,
@@ -241,7 +439,6 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.CARD_BG,
 		lineHeight: 24,
 	},
-	// FOOTER — DI LUAR SCROLLVIEW → SELALU DI ATAS KEYBOARD
 	footer: {
 		paddingHorizontal: 20,
 		paddingVertical: 16,

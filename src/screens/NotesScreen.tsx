@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native"; // <--- Import Penting
 import {
   useCallback,
   useEffect,
@@ -145,14 +145,15 @@ function NotesScreen({}: NotesScreenProps) {
     }
   }, [user?.uid]);
 
-  useEffect(() => {
-    if (user?.uid) {
-      setLoading(true);
-      loadNotes();
-    } else {
-      setLoading(false);
-    }
-  }, [user?.uid, loadNotes]);
+  // === PERBAIKAN UTAMA: AUTO REFRESH ===
+  // Kode ini memastikan data dimuat ulang setiap kali layar Notes aktif
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.uid) {
+        loadNotes();
+      }
+    }, [user?.uid, loadNotes])
+  );
 
   // === LOGIKA INTERAKSI ===
   const handleLongPress = (noteId: string) => {
@@ -328,7 +329,6 @@ function NotesScreen({}: NotesScreenProps) {
         </Text>
 
         <View style={styles.cardFooter}>
-          {/* === UPDATE FORMAT TANGGAL DI SINI === */}
           <Text style={styles.date}>
             {new Date(item.updatedAt.seconds * 1000).toLocaleString("id-ID", {
               day: "numeric",

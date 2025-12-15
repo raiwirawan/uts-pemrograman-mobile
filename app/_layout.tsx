@@ -1,48 +1,34 @@
 import {
-  Inter_400Regular,
-  Inter_700Bold,
+  Poppins_400Regular,
+  Poppins_700Bold,
   useFonts,
-} from "@expo-google-fonts/inter";
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+} from "@expo-google-fonts/poppins";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import { useColorScheme } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
 
-function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [fontsLoaded] = useFonts({
-    "Inter-Bold": Inter_700Bold,
-    "Inter-Regular": Inter_400Regular,
+export default function RootLayout() {
+  const [loaded, error] = useFonts({
+    // KITA BERI NAMA STRING MANUAL DI SINI:
+    "Poppins-Regular": Poppins_400Regular,
+    "Poppins-Bold": Poppins_700Bold,
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
+    if (loaded || error) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [loaded, error]);
 
-  if (!fontsLoaded) {
+  if (!loaded && !error) {
     return null;
   }
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        <Stack.Screen name="index" />
-      </Stack>
-    </ThemeProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+    </Stack>
   );
 }
-
-export default RootLayout;

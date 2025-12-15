@@ -1,16 +1,23 @@
 // app/(tabs)/notes.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useCallback, useEffect, useState } from "react";
 import {
-	ActivityIndicator,
-	Alert,
-	FlatList,
-	RefreshControl,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import colors from "@/constants/colors";
@@ -18,269 +25,424 @@ import { useAuth } from "@/hooks/useAuth";
 import { deleteNote, getUserNotes, Note } from "@/lib/notes";
 import { NotesScreenProps } from "@/types/navigation";
 
+// Tipe untuk pilihan sort
+type SortOption = "newest" | "oldest" | "az" | "za";
+
 // eslint-disable-next-line no-empty-pattern
 function NotesScreen({}: NotesScreenProps) {
-	const { user } = useAuth();
-	const navigation = useNavigation<NotesScreenProps["navigation"]>();
-	const [notes, setNotes] = useState<Note[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [refreshing, setRefreshing] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const navigation = useNavigation<NotesScreenProps["navigation"]>();
 
-	const loadNotes = useCallback(async () => {
-		if (!user?.uid) return;
+  // State Data
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-		try {
-			const data = await getUserNotes(user.uid);
-			setNotes(data);
-			setError(null);
-		} catch (err: any) {
-			console.error("Failed to fetch notes:", err);
-			setError(err.message || "Gagal memuat catatan");
-		} finally {
-			setLoading(false);
-			setRefreshing(false);
-		}
-	}, [user?.uid]);
+  // State Sorting (Baru)
+  const [sortOption, setSortOption] = useState<SortOption>("newest");
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
-	useEffect(() => {
-		if (user?.uid) {
-			setLoading(true);
-			loadNotes();
-		} else {
-			setLoading(false);
-		}
-	}, [user?.uid, loadNotes]);
+  // 1. Tambahkan Tombol Filter ke Header (Baru)
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => setShowSortMenu(true)}
+          style={{ marginRight: 15 }}
+        >
+          <Ionicons name="filter" size={24} color={colors.PRIMARY_PURPLE} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
-	const onRefresh = useCallback(() => {
-		setRefreshing(true);
-		loadNotes();
-	}, [loadNotes]);
+  const loadNotes = useCallback(async () => {
+    if (!user?.uid) return;
 
-	const handleDelete = async (id: string) => {
-		if (!user?.uid) return;
+    try {
+      const data = await getUserNotes(user.uid);
+      setNotes(data);
+      setError(null);
+    } catch (err: any) {
+      console.error("Failed to fetch notes:", err);
+      setError(err.message || "Gagal memuat catatan");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user?.uid]);
 
-		try {
-			await deleteNote(user.uid, id);
-			setNotes((prev) => prev.filter((n) => n.id !== id));
-		} catch (err: any) {
-			Alert.alert("Gagal", err.message);
-		}
-	};
+  useEffect(() => {
+    if (user?.uid) {
+      setLoading(true);
+      loadNotes();
+    } else {
+      setLoading(false);
+    }
+  }, [user?.uid, loadNotes]);
 
-	const renderNote = ({ item }: { item: Note }) => (
-		<TouchableOpacity
-			style={styles.noteCard}
-			onPress={() => {
-				// @ts-ignore
-				navigation.navigate("EditNote", { noteId: item.id, note: item });
-			}}
-		>
-			<Text style={styles.title}>{item.title}</Text>
-			<Text style={styles.description}>
-				{item.content.length > 100
-					? `${item.content.substring(0, 100)}...`
-					: item.content}
-			</Text>
-			<Text style={styles.date}>
-				Updated: {new Date(item.updatedAt.seconds * 1000).toLocaleString()}
-			</Text>
-			<TouchableOpacity
-				onPress={() =>
-					Alert.alert(
-						"Hapus Catatan",
-						"Apakah Anda yakin ingin menghapus catatan ini?",
-						[
-							{ text: "Batal", style: "cancel" },
-							{
-								text: "Hapus",
-								style: "destructive",
-								onPress: () => handleDelete(item.id),
-							},
-						]
-					)
-				}
-				style={styles.deleteBtn}
-			>
-				<Ionicons name="trash-outline" size={24} color={colors.DANGER} />
-			</TouchableOpacity>
-		</TouchableOpacity>
-	);
+  // 2. Logika Sorting Otomatis (Baru)
+  const sortedNotes = useMemo(() => {
+    // Kita copy array dulu agar state asli tidak berubah langsung
+    const data = [...notes];
 
-	if (loading) {
-		return (
-			<View style={styles.centerContent}>
-				<ActivityIndicator size="large" color={colors.PRIMARY_PURPLE} />
-				<Text style={styles.loadingText}>Memuat catatan...</Text>
-			</View>
-		);
-	}
+    switch (sortOption) {
+      case "newest":
+        // Sort berdasarkan updatedAt (Timestamp seconds) besar ke kecil
+        return data.sort((a, b) => b.updatedAt.seconds - a.updatedAt.seconds);
+      case "oldest":
+        return data.sort((a, b) => a.updatedAt.seconds - b.updatedAt.seconds);
+      case "az":
+        return data.sort((a, b) => a.title.localeCompare(b.title));
+      case "za":
+        return data.sort((a, b) => b.title.localeCompare(a.title));
+      default:
+        return data;
+    }
+  }, [notes, sortOption]);
 
-	if (error) {
-		return (
-			<View style={styles.centerContent}>
-				<Ionicons name="alert-circle-outline" size={80} color={colors.DANGER} />
-				<Text style={styles.errorText}>{error}</Text>
-				<TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
-					<Text style={styles.retryText}>Coba Lagi</Text>
-				</TouchableOpacity>
-			</View>
-		);
-	}
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadNotes();
+  }, [loadNotes]);
 
-	return (
-		<View style={styles.container}>
-			<FlatList
-				data={notes}
-				renderItem={renderNote}
-				keyExtractor={(item) => item.id}
-				refreshControl={
-					<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-				}
-				ListEmptyComponent={
-					<View style={styles.emptyContainer}>
-						<Ionicons
-							name="document-outline"
-							size={100}
-							color={colors.DIVIDER}
-						/>
-						<Text style={styles.emptyTitle}>Belum ada catatan</Text>
-						<Text style={styles.emptySubtitle}>
-							Tekan tombol + untuk membuat catatan pertama Anda
-						</Text>
-					</View>
-				}
-			/>
+  const handleDelete = async (id: string) => {
+    if (!user?.uid) return;
 
-			{/* FAB */}
-			<TouchableOpacity
-				style={styles.addBtn}
-				onPress={() => navigation.navigate("AddNote" as never)}
-			>
-				<Ionicons name="add" size={30} color={colors.WHITE} />
-			</TouchableOpacity>
-		</View>
-	);
+    try {
+      await deleteNote(user.uid, id);
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+    } catch (err: any) {
+      Alert.alert("Gagal", err.message);
+    }
+  };
+
+  const renderNote = ({ item }: { item: Note }) => (
+    <TouchableOpacity
+      style={styles.noteCard}
+      onPress={() => {
+        // @ts-ignore
+        navigation.navigate("EditNote", { noteId: item.id, note: item });
+      }}
+    >
+      <Text style={styles.title}>{item.title}</Text>
+      <Text style={styles.description}>
+        {item.content.length > 100
+          ? `${item.content.substring(0, 100)}...`
+          : item.content}
+      </Text>
+      <Text style={styles.date}>
+        Updated: {new Date(item.updatedAt.seconds * 1000).toLocaleString()}
+      </Text>
+      <TouchableOpacity
+        onPress={() =>
+          Alert.alert(
+            "Hapus Catatan",
+            "Apakah Anda yakin ingin menghapus catatan ini?",
+            [
+              { text: "Batal", style: "cancel" },
+              {
+                text: "Hapus",
+                style: "destructive",
+                onPress: () => handleDelete(item.id),
+              },
+            ]
+          )
+        }
+        style={styles.deleteBtn}
+      >
+        <Ionicons name="trash-outline" size={24} color={colors.DANGER} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.centerContent}>
+        <ActivityIndicator size="large" color={colors.PRIMARY_PURPLE} />
+        <Text style={styles.loadingText}>Memuat catatan...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centerContent}>
+        <Ionicons name="alert-circle-outline" size={80} color={colors.DANGER} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
+          <Text style={styles.retryText}>Coba Lagi</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={sortedNotes} // <--- GANTI 'notes' JADI 'sortedNotes'
+        renderItem={renderNote}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons
+              name="document-outline"
+              size={100}
+              color={colors.DIVIDER}
+            />
+            <Text style={styles.emptyTitle}>Belum ada catatan</Text>
+            <Text style={styles.emptySubtitle}>
+              Tekan tombol + untuk membuat catatan pertama Anda
+            </Text>
+          </View>
+        }
+      />
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={styles.addBtn}
+        onPress={() => navigation.navigate("AddNote" as never)}
+      >
+        <Ionicons name="add" size={30} color={colors.WHITE} />
+      </TouchableOpacity>
+
+      {/* 3. MODAL PILIHAN SORT (Baru) */}
+      <Modal
+        visible={showSortMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSortMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSortMenu(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Urutkan Catatan</Text>
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setSortOption("newest");
+                setShowSortMenu(false);
+              }}
+            >
+              <Ionicons
+                name={
+                  sortOption === "newest"
+                    ? "radio-button-on"
+                    : "radio-button-off"
+                }
+                size={20}
+                color={colors.PRIMARY_PURPLE}
+              />
+              <Text style={styles.optionText}>Terbaru diupdate</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setSortOption("oldest");
+                setShowSortMenu(false);
+              }}
+            >
+              <Ionicons
+                name={
+                  sortOption === "oldest"
+                    ? "radio-button-on"
+                    : "radio-button-off"
+                }
+                size={20}
+                color={colors.PRIMARY_PURPLE}
+              />
+              <Text style={styles.optionText}>Terlama diupdate</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setSortOption("az");
+                setShowSortMenu(false);
+              }}
+            >
+              <Ionicons
+                name={
+                  sortOption === "az" ? "radio-button-on" : "radio-button-off"
+                }
+                size={20}
+                color={colors.PRIMARY_PURPLE}
+              />
+              <Text style={styles.optionText}>Judul (A-Z)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setSortOption("za");
+                setShowSortMenu(false);
+              }}
+            >
+              <Ionicons
+                name={
+                  sortOption === "za" ? "radio-button-on" : "radio-button-off"
+                }
+                size={20}
+                color={colors.PRIMARY_PURPLE}
+              />
+              <Text style={styles.optionText}>Judul (Z-A)</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		paddingVertical: 20,
-		backgroundColor: colors.BACKGROUND,
-	},
-	centerContent: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		padding: 20,
-	},
-	noteCard: {
-		backgroundColor: colors.WHITE,
-		padding: 16,
-		marginHorizontal: 12,
-		marginVertical: 6,
-		borderRadius: 12,
-		shadowColor: colors.SHADOW,
-		shadowOpacity: 0.08,
-		shadowRadius: 8,
-		elevation: 3,
-		position: "relative",
-	},
-	title: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: colors.TEXT_DARK,
-		marginBottom: 6,
-	},
-	description: {
-		fontSize: 14,
-		color: colors.TEXT_GREY,
-		lineHeight: 20,
-	},
-	date: {
-		fontSize: 12,
-		color: colors.TEXT_LIGHT_GREY,
-		marginTop: 8,
-	},
-	deleteBtn: {
-		position: "absolute",
-		right: 12,
-		top: 12,
-		padding: 4,
-	},
-	addBtn: {
-		position: "absolute",
-		bottom: 30,
-		right: 20,
-		backgroundColor: colors.FAB_BG,
-		width: 60,
-		height: 60,
-		borderRadius: 30,
-		justifyContent: "center",
-		alignItems: "center",
-		elevation: 6,
-		shadowColor: colors.FAB_SHADOW,
-		shadowOffset: { width: 0, height: 3 },
-		shadowOpacity: 0.4,
-		shadowRadius: 5,
-	},
-	emptyContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		paddingHorizontal: 40,
-		paddingVertical: 160,
-	},
-	emptyTitle: {
-		fontSize: 22,
-		fontWeight: "bold",
-		color: colors.TEXT_DARK,
-		marginTop: 20,
-		marginBottom: 8,
-	},
-	emptySubtitle: {
-		fontSize: 16,
-		color: colors.TEXT_GREY,
-		textAlign: "center",
-		marginBottom: 30,
-	},
-	createFirstBtn: {
-		flexDirection: "row",
-		backgroundColor: colors.FAB_BG,
-		paddingHorizontal: 24,
-		paddingVertical: 14,
-		borderRadius: 30,
-		alignItems: "center",
-		gap: 10,
-	},
-	createFirstText: {
-		color: colors.WHITE,
-		fontSize: 16,
-		fontWeight: "600",
-	},
-	errorText: {
-		color: colors.DANGER,
-		fontSize: 16,
-		textAlign: "center",
-		marginBottom: 16,
-	},
-	retryButton: {
-		backgroundColor: colors.FAB_BG,
-		paddingHorizontal: 24,
-		paddingVertical: 12,
-		borderRadius: 8,
-	},
-	retryText: {
-		color: colors.WHITE,
-		fontSize: 16,
-		fontWeight: "600",
-	},
-	loadingText: {
-		marginTop: 16,
-		color: colors.TEXT_GREY,
-		fontSize: 16,
-	},
+  container: {
+    flex: 1,
+    paddingVertical: 20,
+    backgroundColor: colors.BACKGROUND,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  noteCard: {
+    backgroundColor: colors.WHITE,
+    padding: 16,
+    marginHorizontal: 12,
+    marginVertical: 6,
+    borderRadius: 12,
+    shadowColor: colors.SHADOW,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    position: "relative",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    fontFamily: "Poppins-Bold", // Pastikan font terpakai
+    color: colors.TEXT_DARK,
+    marginBottom: 6,
+  },
+  description: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    color: colors.TEXT_GREY,
+    lineHeight: 20,
+  },
+  date: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: colors.TEXT_LIGHT_GREY,
+    marginTop: 8,
+  },
+  deleteBtn: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    padding: 4,
+  },
+  addBtn: {
+    position: "absolute",
+    bottom: 30,
+    right: 20,
+    backgroundColor: colors.FAB_BG,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 6,
+    shadowColor: colors.FAB_SHADOW,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 40,
+    paddingVertical: 160,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: colors.TEXT_DARK,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: colors.TEXT_GREY,
+    textAlign: "center",
+    marginBottom: 30,
+  },
+  errorText: {
+    color: colors.DANGER,
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: colors.FAB_BG,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: colors.WHITE,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  loadingText: {
+    marginTop: 16,
+    color: colors.TEXT_GREY,
+    fontSize: 16,
+  },
+  // Styles untuk Modal (Baru)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontFamily: "Poppins-Bold",
+    fontSize: 16,
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  modalOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f5f5",
+  },
+  optionText: {
+    marginLeft: 10,
+    fontFamily: "Poppins-Regular",
+    fontSize: 14,
+    color: colors.TEXT_DARK,
+  },
 });
 
 export default NotesScreen;

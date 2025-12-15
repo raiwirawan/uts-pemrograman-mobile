@@ -1,3 +1,4 @@
+//update multiple delete notes import statement
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native"; // <--- Import Penting
 import {

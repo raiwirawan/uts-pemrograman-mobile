@@ -17,8 +17,10 @@ import {
 export type Note = {
   id: string;
   title: string;
-  content: string; // ← TAMBAH INI
+  content: string;
   userId: string;
+  imageUrl?: string | null; // <--- Saya rapikan biar konsisten
+  isFavorite?: boolean; // <--- TAMBAHAN BARU
   createdAt: any;
   updatedAt: any;
 };
@@ -29,7 +31,8 @@ const NOTES_COLLECTION = "notes";
 export const createNote = async (
   userId: string,
   title: string,
-  content: string
+  content: string,
+  imageUrl: string | null = null // Opsional
 ): Promise<string> => {
   if (!userId) throw new Error("userId diperlukan");
 
@@ -37,6 +40,8 @@ export const createNote = async (
     title: title.trim(),
     content: content.trim(),
     userId,
+    imageUrl: imageUrl,
+    isFavorite: false, // Default: Tidak favorite
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -89,7 +94,7 @@ export const getNoteById = async (
 export const updateNote = async (
   userId: string,
   noteId: string,
-  updates: { title?: string; content?: string }
+  updates: { title?: string; content?: string; imageUrl?: string | null }
 ): Promise<void> => {
   if (!userId) throw new Error("userId diperlukan");
 
@@ -105,8 +110,29 @@ export const updateNote = async (
   });
 };
 
-// === DELETE ===
+// === TOGGLE FAVORITE (BARU) ===
+export const toggleFavoriteNote = async (
+  userId: string,
+  noteId: string,
+  currentStatus: boolean
+): Promise<void> => {
+  if (!userId) throw new Error("userId diperlukan");
 
+  const docRef = doc(db, NOTES_COLLECTION, noteId);
+
+  // Validasi pemilik (agar aman)
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) throw new Error("Catatan tidak ditemukan");
+  if (docSnap.data().userId !== userId) throw new Error("Akses ditolak");
+
+  // Update status favorite
+  await updateDoc(docRef, {
+    isFavorite: !currentStatus,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+// === DELETE ===
 export const deleteNote = async (
   userId: string,
   noteId: string
@@ -128,19 +154,21 @@ export const deleteNote = async (
   await deleteDoc(docRef);
 };
 
-// Update tipe data NoteData (atau sesuaikan dengan interface yang Anda punya)
+// === INTERFACE BAWAAN (Update) ===
 export interface NoteData {
   title: string;
   content: string;
   userId: string;
-  imageUrl?: string | null; // <--- Tambahkan opsional string
+  imageUrl?: string | null;
+  isFavorite?: boolean; // <--- Tambah ini
 }
 
 export const addNote = async (data: NoteData) => {
   try {
     await addDoc(collection(db, "notes"), {
       ...data,
-      imageUrl: data.imageUrl || null, // Simpan null jika tidak ada gambar
+      imageUrl: data.imageUrl || null,
+      isFavorite: data.isFavorite || false, // Default false
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

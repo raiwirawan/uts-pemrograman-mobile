@@ -1,166 +1,142 @@
 import {
-	addDoc,
-	collection,
-	deleteDoc,
-	doc,
-	DocumentData,
-	DocumentSnapshot,
-	getDoc,
-	onSnapshot,
-	orderBy,
-	query,
-	QuerySnapshot,
-	serverTimestamp,
-	Timestamp,
-	updateDoc,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  DocumentData,
+  DocumentSnapshot,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  Timestamp,
+  updateDoc,
+  writeBatch,
 } from "firebase/firestore";
-import { db } from "../config/firebase"; // <-- Menggunakan impor relatif: "./firebase"
+import { db } from "../config/firebase";
 
-// --- 1. INTERFACE & TYPES ---
-
-export interface Todo {
-	id?: string;
-	userId: string;
-	title: string;
-	description?: string;
-	checked: boolean;
-	createdAt: Timestamp | Date | any;
-	updatedAt: Timestamp | Date | any;
+// --- 1. INTERFACE ---
+export interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
 }
 
-// --- 2. HELPERS ---
+export interface Todo {
+  id?: string;
+  userId: string;
+  title: string;
+  description?: string;
+  checked: boolean;
+  isFavorite: boolean;
+  dueDate?: Timestamp | Date | null; // <--- TANGGAL DEADLINE
+  subtasks: Subtask[]; // <--- SUBTASKS (BULLET POINTS)
+  createdAt: Timestamp | Date | any;
+  updatedAt: Timestamp | Date | any;
+}
 
-type FirestoreSnapshot =
-	| QuerySnapshot<DocumentData>
-	| DocumentSnapshot<DocumentData>;
-
+// --- 2. CONVERTER ---
 const todoConverter = {
-	toFirestore: (todo: Partial<Todo>): DocumentData => {
-		return {
-			userId: todo.userId,
-			title: todo.title,
-			description: todo.description || "",
-			checked: todo.checked || false,
-			updatedAt: serverTimestamp(),
-			...(todo.createdAt && { createdAt: todo.createdAt }),
-		};
-	},
-
-	fromFirestore: (snapshot: FirestoreSnapshot): Todo[] | Todo => {
-		// 1. Cek jika ini adalah snapshot dokumen tunggal (DocumentSnapshot)
-		if (!("docs" in snapshot)) {
-			const docSnap = snapshot as DocumentSnapshot<DocumentData>;
-
-			if (!docSnap.exists()) {
-				// Tidak akan terjadi karena sudah dicek di getTodo, tapi jaga-jaga
-				throw new Error("Document data is null (does not exist).");
-			}
-
-			const docData = docSnap.data();
-			if (!docData) throw new Error("Document data is null.");
-
-			return {
-				id: docSnap.id,
-				userId: docData.userId,
-				title: docData.title,
-				description: docData.description,
-				checked: docData.checked,
-				createdAt: docData.createdAt,
-				updatedAt: docData.updatedAt,
-			} as Todo;
-		}
-
-		// 2. Jika ini adalah QuerySnapshot (Daftar dokumen)
-		const querySnap = snapshot as QuerySnapshot<DocumentData>;
-
-		return querySnap.docs.map(
-			(doc) =>
-				({
-					id: doc.id,
-					userId: doc.data().userId,
-					title: doc.data().title,
-					description: doc.data().description,
-					checked: doc.data().checked,
-					createdAt: doc.data().createdAt,
-					updatedAt: doc.data().updatedAt,
-				}) as Todo
-		);
-	},
+  toFirestore: (todo: Partial<Todo>): DocumentData => {
+    return {
+      userId: todo.userId,
+      title: todo.title,
+      description: todo.description || "",
+      checked: todo.checked || false,
+      isFavorite: todo.isFavorite || false,
+      dueDate: todo.dueDate || null,
+      subtasks: todo.subtasks || [],
+      updatedAt: serverTimestamp(),
+      ...(todo.createdAt && { createdAt: todo.createdAt }),
+    };
+  },
+  fromFirestore: (snapshot: DocumentSnapshot): Todo => {
+    const data = snapshot.data();
+    return {
+      id: snapshot.id,
+      userId: data?.userId,
+      title: data?.title,
+      description: data?.description,
+      checked: data?.checked,
+      isFavorite: data?.isFavorite || false,
+      dueDate: data?.dueDate,
+      subtasks: data?.subtasks || [],
+      createdAt: data?.createdAt,
+      updatedAt: data?.updatedAt,
+    } as Todo;
+  },
 };
 
 // --- 3. CRUD OPERATIONS ---
-
-const getTodosCollectionRef = (userId: string) =>
-	collection(db, "users", userId, "todos");
+const getTodosRef = (userId: string) =>
+  collection(db, "users", userId, "todos");
 
 export const createTodo = async (
-	userId: string,
-	title: string,
-	description: string
+  userId: string,
+  title: string,
+  description: string,
+  dueDate: Date | null,
+  subtasks: Subtask[]
 ) => {
-	const todosRef = getTodosCollectionRef(userId);
-
-	const newTodoData: Partial<Todo> & { createdAt: any; updatedAt: any } = {
-		userId,
-		title,
-		description,
-		checked: false,
-		createdAt: serverTimestamp(),
-		updatedAt: serverTimestamp(),
-	};
-
-	await addDoc(todosRef, newTodoData);
-};
-
-export const getTodo = async (
-	userId: string,
-	todoId: string
-): Promise<Todo | null> => {
-	const todoRef = doc(db, "users", userId, "todos", todoId);
-	const docSnap = await getDoc(todoRef);
-
-	if (docSnap.exists()) {
-		return todoConverter.fromFirestore(docSnap) as Todo;
-	}
-	return null;
+  await addDoc(
+    getTodosRef(userId),
+    todoConverter.toFirestore({
+      userId,
+      title,
+      description,
+      checked: false,
+      isFavorite: false,
+      dueDate: dueDate,
+      subtasks: subtasks,
+      createdAt: serverTimestamp(),
+    })
+  );
 };
 
 export const updateTodo = async (
-	userId: string,
-	todoId: string,
-	updates: Partial<Omit<Todo, "userId" | "createdAt">>
+  userId: string,
+  todoId: string,
+  updates: Partial<Todo>
 ) => {
-	const todoRef = doc(db, "users", userId, "todos", todoId);
-
-	await updateDoc(todoRef, {
-		...updates,
-		updatedAt: serverTimestamp(),
-	});
+  const ref = doc(db, "users", userId, "todos", todoId);
+  await updateDoc(ref, { ...updates, updatedAt: serverTimestamp() });
 };
 
 export const deleteTodo = async (userId: string, todoId: string) => {
-	const todoRef = doc(db, "users", userId, "todos", todoId);
-	await deleteDoc(todoRef);
+  await deleteDoc(doc(db, "users", userId, "todos", todoId));
+};
+
+export const deleteMultipleTodos = async (
+  userId: string,
+  todoIds: string[]
+) => {
+  const batch = writeBatch(db);
+  todoIds.forEach((id) => {
+    const ref = doc(db, "users", userId, "todos", id);
+    batch.delete(ref);
+  });
+  await batch.commit();
+};
+
+export const toggleFavoriteTodo = async (
+  userId: string,
+  todoId: string,
+  currentStatus: boolean
+) => {
+  const ref = doc(db, "users", userId, "todos", todoId);
+  await updateDoc(ref, {
+    isFavorite: !currentStatus,
+    updatedAt: serverTimestamp(),
+  });
 };
 
 export const getUserTodos = (
-	userId: string,
-	callback: (todos: Todo[]) => void
+  userId: string,
+  callback: (todos: Todo[]) => void
 ) => {
-	const todosRef = getTodosCollectionRef(userId);
-
-	const todosQuery = query(todosRef, orderBy("updatedAt", "desc"));
-
-	const unsubscribe = onSnapshot(
-		todosQuery,
-		(snapshot) => {
-			const todos = todoConverter.fromFirestore(snapshot) as Todo[];
-			callback(todos);
-		},
-		(error) => {
-			console.error("Error fetching todos: ", error);
-		}
-	);
-
-	return unsubscribe;
+  const q = query(getTodosRef(userId), orderBy("updatedAt", "desc"));
+  return onSnapshot(q, (snapshot) => {
+    const todos = snapshot.docs.map((doc) => todoConverter.fromFirestore(doc));
+    callback(todos);
+  });
 };

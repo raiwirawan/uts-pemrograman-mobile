@@ -1,7 +1,10 @@
 // screens/EditNoteScreen.tsx
 import { Ionicons } from "@expo/vector-icons";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useEffect, useState } from "react";
+import * as ImagePicker from "expo-image-picker";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -29,19 +32,14 @@ import { EditNoteScreenProps } from "@/types/navigation";
 
 // eslint-disable-next-line no-empty-pattern
 export default function EditNoteScreen({}: EditNoteScreenProps) {
-	const route = useRoute<EditNoteScreenProps["route"]>();
-	const navigation = useNavigation<EditNoteScreenProps["navigation"]>();
-	const { user } = useAuth();
+  const route = useRoute<EditNoteScreenProps["route"]>();
+  const navigation = useNavigation<EditNoteScreenProps["navigation"]>();
+  const { user } = useAuth();
 
-	const note = route.params?.note;
+  const headerHeight = useHeaderHeight();
 
-	useEffect(() => {
-		if (!note) {
-			Alert.alert("Error", "Catatan tidak ditemukan", [
-				{ text: "Kembali", onPress: () => navigation.goBack() },
-			]);
-		}
-	}, [note, navigation]);
+  const [permission, requestPermission] = ImagePicker.useCameraPermissions();
+  const note = route.params?.note;
 
 	const [title, setTitle] = useState(note?.title ?? "");
 	const [content, setContent] = useState(note?.content ?? "");
@@ -56,25 +54,9 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 	const [uploading, setUploading] = useState(false);
 	const [hasChanges, setHasChanges] = useState(false);
 
-	useEffect(() => {
-		const unsubscribe = navigation.addListener("beforeRemove", (e) => {
-			if (!hasChanges || saving || deleting) return;
-			e.preventDefault();
-			Alert.alert(
-				"Buang perubahan?",
-				"Catatan belum disimpan. Keluar tanpa simpan?",
-				[
-					{ text: "Tetap di sini", style: "cancel" },
-					{
-						text: "Buang",
-						style: "destructive",
-						onPress: () => navigation.dispatch(e.data.action),
-					},
-				]
-			);
-		});
-		return unsubscribe;
-	}, [navigation, hasChanges, saving, deleting]);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
 	// === PICK IMAGE FROM GALLERY ===
 	const handlePickImage = async () => {
@@ -240,14 +222,20 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 		]);
 	};
 
-	if (!note) {
-		return (
-			<View style={styles.centerContent}>
-				<ActivityIndicator size="large" color={colors.PRIMARY_PURPLE} />
-				<Text style={styles.loadingText}>Memuat catatan...</Text>
-			</View>
-		);
-	}
+  // === DETEKSI KEYBOARD (LOGIKA BARU) ===
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      () => {
+        setKeyboardVisible(true); // Keyboard Muncul -> Aktifkan Padding Besar
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => {
+        setKeyboardVisible(false); // Keyboard Hilang -> Matikan Padding
+      }
+    );
 
 	return (
 		<KeyboardAvoidingView
@@ -341,24 +329,299 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 						)}
 					</TouchableOpacity>
 
-					<TouchableOpacity
-						style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-						onPress={handleSave}
-						disabled={saving}
-					>
-						{saving ? (
-							<ActivityIndicator color={colors.WHITE} />
-						) : (
-							<>
-								<Ionicons name="checkmark" size={20} color={colors.WHITE} />
-								<Text style={styles.saveText}>Simpan</Text>
-							</>
-						)}
-					</TouchableOpacity>
-				</View>
-			</View>
-		</KeyboardAvoidingView>
-	);
+  // === BACK HANDLER ===
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
+      if (!hasChanges || saving || deleting) return;
+      e.preventDefault();
+      Alert.alert(
+        "Buang perubahan?",
+        "Catatan belum disimpan. Keluar tanpa simpan?",
+        [
+          { text: "Tetap di sini", style: "cancel" },
+          {
+            text: "Buang",
+            style: "destructive",
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+        ]
+      );
+    });
+    return unsubscribe;
+  }, [navigation, hasChanges, saving, deleting]);
+
+  // === FUNGSI LOGIKA (Sama) ===
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
+      if (!result.canceled) {
+        setImageUri(result.assets[0].uri);
+        setHasChanges(true);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Gagal mengambil gambar");
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      if (!permission?.granted) {
+        const request = await requestPermission();
+        if (!request.granted) {
+          Alert.alert("Izin Ditolak", "Izinkan akses kamera.");
+          return;
+        }
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
+      if (!result.canceled) {
+        setImageUri(result.assets[0].uri);
+        setHasChanges(true);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Gagal membuka kamera");
+    }
+  };
+
+  const uploadImage = async (uri: string, userId: string) => {
+    try {
+      const blob: any = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = function () {
+          resolve(xhr.response);
+        };
+        xhr.onerror = function (e) {
+          reject(new TypeError("Network request failed"));
+        };
+        xhr.responseType = "blob";
+        xhr.open("GET", uri, true);
+        xhr.send(null);
+      });
+      const bucketUrl = "gs://notenote-129d8.firebasestorage.app";
+      const filename = `notes/${userId}/${Date.now()}.jpg`;
+      const storageRef = ref(storage, `${bucketUrl}/${filename}`);
+      const metadata = { contentType: "image/jpeg" };
+      await uploadBytes(storageRef, blob, metadata);
+      blob.close();
+      return await getDownloadURL(storageRef);
+    } catch (error: any) {
+      throw new Error(`Gagal upload: ${error.message}`);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!title.trim() || !content.trim()) {
+      Alert.alert("Error", "Judul & isi wajib diisi");
+      return;
+    }
+    if (!user?.uid || !note?.id) return;
+    setSaving(true);
+    Keyboard.dismiss();
+    try {
+      let finalImageUrl = imageUri;
+      if (imageUri && !imageUri.startsWith("http")) {
+        finalImageUrl = await uploadImage(imageUri, user.uid);
+      }
+      await updateNote(user.uid, note.id, {
+        title: title.trim(),
+        content: content.trim(),
+        imageUrl: finalImageUrl,
+      });
+      setHasChanges(false);
+      setIsEditing(false);
+      Alert.alert("Sukses", "Catatan berhasil disimpan");
+    } catch (err: any) {
+      Alert.alert("Gagal menyimpan", err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!note?.id) return;
+    Alert.alert("Hapus Catatan", "Yakin hapus permanen?", [
+      { text: "Batal", style: "cancel" },
+      {
+        text: "Hapus",
+        style: "destructive",
+        onPress: async () => {
+          if (!user?.uid) return;
+          setDeleting(true);
+          try {
+            await deleteNote(user.uid, note.id);
+            navigation.navigate("Home" as never);
+          } catch (err: any) {
+            Alert.alert("Gagal menghapus", err.message);
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  if (!note)
+    return (
+      <View style={styles.centerContent}>
+        <ActivityIndicator size="large" color={colors.PRIMARY_PURPLE} />
+      </View>
+    );
+
+  return (
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? headerHeight : 0}
+      >
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.scrollContent,
+            // DINAMIS: Jika keyboard ada, padding=400. Jika tidak, padding=20 (standar)
+            { paddingBottom: isKeyboardVisible ? 400 : 20 },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* === JUDUL === */}
+          {isEditing ? (
+            <>
+              <Text style={styles.label}>Judul</Text>
+              <TextInput
+                style={styles.titleInput}
+                placeholder="Masukkan judul..."
+                placeholderTextColor={colors.TEXT_LIGHT_GREY}
+                value={title}
+                onChangeText={(text) => {
+                  setTitle(text);
+                  setHasChanges(true);
+                }}
+              />
+            </>
+          ) : (
+            <Text style={styles.viewTitle}>{title}</Text>
+          )}
+
+          {/* === GAMBAR === */}
+          {imageUri && (
+            <View style={styles.imageContainer}>
+              <Image source={{ uri: imageUri }} style={styles.previewImage} />
+              {isEditing && (
+                <TouchableOpacity
+                  style={styles.removeImageBtn}
+                  onPress={() => {
+                    setImageUri(null);
+                    setHasChanges(true);
+                  }}
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={28}
+                    color={colors.DANGER}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* === ISI KONTEN === */}
+          {isEditing ? (
+            <>
+              <Text style={styles.label}>Isi Catatan</Text>
+              <TextInput
+                style={styles.contentInput}
+                placeholder="Tulis isi catatan di sini..."
+                placeholderTextColor={colors.TEXT_LIGHT_GREY}
+                value={content}
+                onChangeText={(text) => {
+                  setContent(text);
+                  setHasChanges(true);
+                }}
+                multiline
+                textAlignVertical="top"
+                scrollEnabled={false}
+              />
+            </>
+          ) : (
+            <>
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: colors.DIVIDER,
+                  marginVertical: 15,
+                }}
+              />
+              <Text style={styles.viewContent}>{content}</Text>
+            </>
+          )}
+        </ScrollView>
+
+        {/* === FOOTER === */}
+        {isEditing && (
+          <View style={styles.footer}>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={takePhoto}
+                disabled={saving || deleting}
+              >
+                <Ionicons
+                  name="camera-outline"
+                  size={24}
+                  color={colors.PRIMARY_PURPLE}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={pickImage}
+                disabled={saving || deleting}
+              >
+                <Ionicons
+                  name="image-outline"
+                  size={24}
+                  color={colors.PRIMARY_PURPLE}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={handleDelete}
+                disabled={deleting || saving}
+              >
+                {deleting ? (
+                  <ActivityIndicator color={colors.DANGER} />
+                ) : (
+                  <Ionicons name="trash" size={20} color={colors.DANGER} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+                onPress={handleSave}
+                disabled={saving || deleting}
+              >
+                {saving ? (
+                  <ActivityIndicator color={colors.WHITE} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark" size={20} color={colors.WHITE} />
+                    <Text style={styles.saveText}>Simpan</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

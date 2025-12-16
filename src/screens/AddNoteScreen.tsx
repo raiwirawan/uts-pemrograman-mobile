@@ -1,6 +1,7 @@
-// screens/AddNoteScreen.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { useEffect, useState } from "react";
 import {
 	ActivityIndicator,
@@ -16,13 +17,13 @@ import {
 	View,
 } from "react-native";
 
+import { storage } from "@/config/firebase";
 import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
 import { createNote } from "@/lib/notes";
 import { pickImage, takePhoto, uploadNoteImage } from "@/lib/storage";
 import { AddNoteScreenProps } from "@/types/navigation";
 
-// eslint-disable-next-line no-empty-pattern
 export default function AddNoteScreen({}: AddNoteScreenProps) {
 	const { user } = useAuth();
 	const navigation = useNavigation<AddNoteScreenProps["navigation"]>();

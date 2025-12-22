@@ -43,10 +43,23 @@ export default function EditTodoScreen() {
   );
   const [newSubtask, setNewSubtask] = useState("");
 
-  // Date State
-  const [dueDate, setDueDate] = useState<Date | null>(
-    todoParam?.dueDate ? new Date(todoParam.dueDate.seconds * 1000) : null
-  );
+  // === DATE STATE & LOGIC PERBAIKAN ===
+  const [dueDate, setDueDate] = useState<Date | null>(() => {
+    if (!todoParam?.dueDate) return null;
+
+    // Jika data berupa Angka (Milliseconds) - Hasil perbaikan serialisasi
+    if (typeof todoParam.dueDate === "number") {
+      return new Date(todoParam.dueDate);
+    }
+
+    // Jika data berupa Timestamp (Firestore Object) - Fallback
+    if (todoParam.dueDate.seconds) {
+      return new Date(todoParam.dueDate.seconds * 1000);
+    }
+
+    return null;
+  });
+
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [isEditing, setIsEditing] = useState(!todoParam);
@@ -145,7 +158,7 @@ export default function EditTodoScreen() {
         await updateTodo(user.uid, todoParam.id, {
           title: title.trim(),
           description: description.trim(),
-          dueDate: dueDate,
+          dueDate: dueDate, // Kirim Date object, Firestore SDK akan handle konversinya
           subtasks: subtasks,
         });
       } else {
@@ -164,12 +177,14 @@ export default function EditTodoScreen() {
         };
         const docRef = await addDoc(todosRef, newTodoData);
 
+        // Update params dengan ID baru (dan konversi date ke angka agar aman di nav state)
         navigation.setParams({
           todo: {
             id: docRef.id,
             ...newTodoData,
-            createdAt: { seconds: Date.now() / 1000 },
-            updatedAt: { seconds: Date.now() / 1000 },
+            dueDate: dueDate ? dueDate.getTime() : null, // Konversi ke number
+            createdAt: Date.now(), // Konversi ke number
+            updatedAt: Date.now(), // Konversi ke number
           },
         });
       }

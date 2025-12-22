@@ -15,6 +15,9 @@ import {
   View,
 } from "react-native";
 
+// === TAMBAHAN IMPORT UNTUK FIX WARNING ===
+import { Timestamp } from "firebase/firestore";
+
 import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -235,7 +238,26 @@ export default function TodoListScreen() {
                 : [...prev, item.id!]
             );
           } else {
-            navigation.navigate("EditTodo", { todo: item });
+            // === PERBAIKAN UTAMA: SERIALISASI DATA ===
+            // Mengubah Timestamp menjadi angka (milliseconds) sebelum dikirim
+            // agar tidak menyebabkan warning "Non-serializable values"
+            const serializedTodo = {
+              ...item,
+              dueDate:
+                item.dueDate instanceof Timestamp
+                  ? item.dueDate.toMillis()
+                  : item.dueDate,
+              createdAt:
+                item.createdAt instanceof Timestamp
+                  ? item.createdAt.toMillis()
+                  : item.createdAt,
+              updatedAt:
+                item.updatedAt instanceof Timestamp
+                  ? item.updatedAt.toMillis()
+                  : item.updatedAt,
+            };
+
+            navigation.navigate("EditTodo", { todo: serializedTodo });
           }
         }}
         activeOpacity={0.7}

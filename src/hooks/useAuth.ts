@@ -23,6 +23,8 @@ export type AuthContextType = {
 	}) => Promise<void>;
 	updateUserEmail: (newEmail: string) => Promise<void>;
 	uploadAvatar: (uri: string) => Promise<string>;
+	resendVerificationEmail: () => Promise<void>;
+	checkEmailVerification: () => Promise<boolean>;
 };
 
 export const AuthContext = createContext<AuthContextType | undefined>(

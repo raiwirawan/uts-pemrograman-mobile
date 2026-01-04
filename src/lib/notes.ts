@@ -18,9 +18,9 @@ import {
 import { deleteNoteImage } from "./storage";
 
 export type Note = {
+	isFavorite: boolean;
 	id: string;
 	title: string;
-
 	content: string;
 	imageUrl?: string; // ← TAMBAH INI untuk menyimpan URL gambar
 	userId: string;

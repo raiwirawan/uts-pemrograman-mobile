@@ -86,3 +86,12 @@ export type ProfileScreenProps = BottomTabScreenProps<
 	RootTabParamList,
 	"Profile"
 >;
+
+export type EmailVerificationScreenProps = {
+	navigation: any;
+	route: {
+		params: {
+			email: string;
+		};
+	};
+};

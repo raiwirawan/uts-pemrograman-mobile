@@ -1,4 +1,4 @@
-import { auth, storage } from "@/config/firebase";
+import { auth } from "@/config/firebase";
 import {
 	createUserWithEmailAndPassword,
 	EmailAuthProvider,
@@ -12,8 +12,8 @@ import {
 	updatePassword,
 	updateProfile,
 } from "firebase/auth";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { Alert } from "react-native";
+import { updateUserProfileImage } from "./userStorage";
 
 export const login = async (email: string, password: string): Promise<void> => {
 	try {
@@ -67,14 +67,7 @@ export const register = async (
 export const googleLogin = async (idToken: string): Promise<void> => {
 	try {
 		const credential = GoogleAuthProvider.credential(idToken);
-		const userCredential = await signInWithCredential(auth, credential);
-
-		// Google accounts are automatically verified
-		// But we can add additional checks if needed
-		if (!userCredential.user.emailVerified) {
-			// Google users should be auto-verified, but just in case
-			console.warn("Google user not verified, marking as verified");
-		}
+		await signInWithCredential(auth, credential);
 	} catch (err: any) {
 		throw new Error(getErrorMessage(err));
 	}
@@ -86,8 +79,6 @@ export const logout = async (): Promise<void> => {
 
 export const resetPassword = async (email: string): Promise<void> => {
 	try {
-		// Firebase will handle if email doesn't exist
-		// It won't throw an error for security reasons (to prevent email enumeration)
 		await sendPasswordResetEmail(auth, email.trim());
 	} catch (err: any) {
 		throw new Error(getErrorMessage(err));
@@ -156,19 +147,30 @@ export const updateUserEmail = async (newEmail: string): Promise<void> => {
 	}
 };
 
+/**
+ * Upload new avatar and delete old one
+ * @param uri - Local URI of new image
+ * @returns New public URL
+ */
 export const uploadAvatar = async (uri: string): Promise<string> => {
 	try {
 		const user = auth.currentUser;
 		if (!user) throw new Error("User tidak ditemukan");
 
-		const response = await fetch(uri);
-		const blob = await response.blob();
-		const storageRef = ref(storage, `avatars/${user.uid}.jpg`);
+		// Get old photo URL before updating
+		const oldPhotoURL = user.photoURL;
 
-		await uploadBytes(storageRef, blob);
-		const url = await getDownloadURL(storageRef);
-		await updateProfile(user, { photoURL: url });
-		return url;
+		// Upload new image and delete old one
+		const newPhotoURL = await updateUserProfileImage(
+			user.uid,
+			oldPhotoURL,
+			uri
+		);
+
+		// Update Firebase Auth profile
+		await updateProfile(user, { photoURL: newPhotoURL });
+
+		return newPhotoURL;
 	} catch (err: any) {
 		throw new Error(getErrorMessage(err));
 	}

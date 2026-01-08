@@ -28,6 +28,7 @@ function EditProfileScreen({ navigation }: EditProfileScreenProps) {
 		user?.photoURL || "https://i.pravatar.cc/128?img=12"
 	);
 	const [loading, setLoading] = useState(false);
+	const [uploadingImage, setUploadingImage] = useState(false);
 
 	useEffect(() => {
 		setFullName(user?.displayName || "");
@@ -44,16 +45,19 @@ function EditProfileScreen({ navigation }: EditProfileScreenProps) {
 		});
 
 		if (!result.canceled) {
-			setLoading(true);
+			setUploadingImage(true);
 			try {
+				// This will now automatically delete the old image
 				const downloadURL = await uploadAvatar(result.assets[0].uri);
 				setPhotoURL(downloadURL);
-				await updateUserProfile({ photoURL: downloadURL });
-				Alert.alert("Sukses", "Foto profil berhasil diupdate");
+				Alert.alert(
+					"Sukses",
+					"Foto profil berhasil diupdate. Foto lama sudah dihapus."
+				);
 			} catch (err: any) {
 				Alert.alert("Gagal", err.message);
 			} finally {
-				setLoading(false);
+				setUploadingImage(false);
 			}
 		}
 	};
@@ -105,12 +109,19 @@ function EditProfileScreen({ navigation }: EditProfileScreenProps) {
 
 				{/* Avatar */}
 				<View style={styles.avatarContainer}>
-					{loading ? (
-						<ActivityIndicator size="large" color={Colors.PRIMARY_PURPLE} />
+					{uploadingImage ? (
+						<View style={styles.avatarPlaceholder}>
+							<ActivityIndicator size="large" color={Colors.PRIMARY_PURPLE} />
+							<Text style={styles.uploadingText}>Mengupload...</Text>
+						</View>
 					) : (
 						<Image source={{ uri: photoURL }} style={styles.avatar} />
 					)}
-					<TouchableOpacity style={styles.changePhotoBtn} onPress={pickImage}>
+					<TouchableOpacity
+						style={styles.changePhotoBtn}
+						onPress={pickImage}
+						disabled={uploadingImage}
+					>
 						<Ionicons name="camera" size={20} color={Colors.WHITE} />
 					</TouchableOpacity>
 				</View>
@@ -124,6 +135,7 @@ function EditProfileScreen({ navigation }: EditProfileScreenProps) {
 					value={fullName}
 					onChangeText={setFullName}
 					autoCapitalize="words"
+					editable={!loading}
 				/>
 
 				{/* Email */}
@@ -137,6 +149,7 @@ function EditProfileScreen({ navigation }: EditProfileScreenProps) {
 					keyboardType="email-address"
 					autoCapitalize="none"
 					autoCorrect={false}
+					editable={!loading}
 				/>
 				<Text style={styles.helperText}>
 					Mengubah email akan logout otomatis untuk verifikasi
@@ -146,7 +159,7 @@ function EditProfileScreen({ navigation }: EditProfileScreenProps) {
 				<TouchableOpacity
 					style={[styles.saveBtn, loading && styles.saveBtnDisabled]}
 					onPress={handleSave}
-					disabled={loading}
+					disabled={loading || uploadingImage}
 				>
 					{loading ? (
 						<ActivityIndicator color={Colors.WHITE} />
@@ -196,21 +209,20 @@ const styles = StyleSheet.create({
 		borderWidth: 4,
 		borderColor: Colors.PRIMARY_PURPLE,
 	},
-	avatarFallback: {
-		width: 96,
-		height: 96,
-		borderRadius: 48,
-		backgroundColor: Colors.PRIMARY_PURPLE,
-		justifyContent: "center",
-		alignItems: "center",
-		marginRight: 20,
+	avatarPlaceholder: {
+		width: 140,
+		height: 140,
+		borderRadius: 70,
 		borderWidth: 4,
 		borderColor: Colors.PRIMARY_PURPLE,
+		backgroundColor: Colors.INPUT_BG,
+		justifyContent: "center",
+		alignItems: "center",
 	},
-	avatarInitials: {
-		fontSize: 32,
-		fontWeight: "bold",
-		color: Colors.WHITE,
+	uploadingText: {
+		marginTop: 8,
+		fontSize: 12,
+		color: Colors.TEXT_GREY,
 	},
 	changePhotoBtn: {
 		position: "absolute",

@@ -2,10 +2,12 @@ import { auth } from "@/config/firebase";
 import { AuthContext, AuthContextType } from "@/hooks/useAuth";
 import {
 	changePassword,
+	checkEmailVerification,
 	googleLogin,
 	login,
 	logout,
 	register,
+	resendVerificationEmail,
 	resetPassword,
 	updateUserEmail,
 	updateUserProfile,
@@ -35,8 +37,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	}, [response]);
 
 	useEffect(() => {
-		const unsubscribe = onAuthStateChanged(auth, (user) => {
-			setUser(user);
+		const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+			// Only set user if email is verified (or if using Google login)
+			if (firebaseUser) {
+				// For Google users, they're automatically verified
+				const isGoogleUser = firebaseUser.providerData.some(
+					(provider) => provider.providerId === "google.com"
+				);
+
+				if (isGoogleUser || firebaseUser.emailVerified) {
+					setUser(firebaseUser);
+				} else {
+					// User not verified, sign them out
+					setUser(null);
+				}
+			} else {
+				setUser(null);
+			}
 			setLoading(false);
 		});
 		return unsubscribe;
@@ -56,6 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		updateUserProfile,
 		updateUserEmail,
 		uploadAvatar,
+		resendVerificationEmail,
+		checkEmailVerification,
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

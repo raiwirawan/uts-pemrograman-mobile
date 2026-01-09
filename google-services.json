@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "34424909742",
+    "project_id": "notenote-129d8",
+    "storage_bucket": "notenote-129d8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:34424909742:android:4e05679c64e3e35d67a23f",
+        "android_client_info": {
+          "package_name": "com.notenote.chillguys"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "34424909742-de664b6oktmqhskvmunpgai9mg5bdcue.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.notenote.chillguys",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "34424909742-5d36rvoh8b1h8e23j3q42q775c8kguje.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbuQt94R5AkGdw_BD-h4GVAR74TE0WPRQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "34424909742-5d36rvoh8b1h8e23j3q42q775c8kguje.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

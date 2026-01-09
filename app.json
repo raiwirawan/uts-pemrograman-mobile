@@ -67,13 +67,7 @@
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to tag your notes."
         }
       ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#8B5CF6"
-        }
-      ],
+      "expo-notifications",
       "@react-native-google-signin/google-signin",
       "@react-native-community/datetimepicker"
     ],

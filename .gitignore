@@ -42,3 +42,9 @@ app-example
 # generated native folders
 /ios
 /android
+
+# supabase
+.supabase
+
+# google-service.json
+google-service.json

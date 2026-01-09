@@ -13,6 +13,8 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
 import { ProfileScreenProps } from "@/types/navigation";
 
+import { commonStyles } from "@/styles/commonStyles";
+
 type SettingItemProps = {
   iconName: React.ComponentProps<typeof Ionicons>["name"];
   title: string;
@@ -93,9 +95,9 @@ function ProfileScreen({ navigation }: ProfileScreenProps) {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={commonStyles.container}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={commonStyles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Header */}

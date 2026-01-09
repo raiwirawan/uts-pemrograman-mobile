@@ -1,108 +1,129 @@
 {
-  "expo": {
-    "name": "NoteNote",
-    "description": "Aplikasi catatan dan to-do list sederhana dengan Firebase Auth & Firestore. Catat ide, wujudkan mimpi.",
-    "slug": "notenote",
-    "owner": "raiwirawan",
-    "currentFullName": "NoteNote",
-    "originalFullName": "NoteNote",
-    "runtimeVersion": {
-      "policy": "sdkVersion"
-    },
-    "version": "1.0.0",
-    "platforms": ["ios", "android", "web"],
-    "githubUrl": "https://github.com/raiwirawan/uts-pemrograman-mobile",
-    "orientation": "portrait",
-    "userInterfaceStyle": "light",
-    "backgroundColor": "#FFFFFF",
-    "primaryColor": "#6A1B9A",
-    "icon": "./assets/images/icon.png",
-    "notification": {
-      "icon": "./assets/images/favicon.png",
-      "color": "#6A1B9A",
-      "androidMode": "default"
-    },
-    "androidNavigationBar": {
-      "backgroundColor": "#FFFFFF",
-      "barStyle": "dark-content"
-    },
-    "developmentClient": {
-      "silentLaunch": true
-    },
-    "scheme": "notenote",
-    "updates": {
-      "fallbackToCacheTimeout": 0,
-      "enabled": true
-    },
-    "locales": {},
-    "plugins": [
-      "expo-router",
-      [
-        "expo-image-picker",
-        {
-          "cameraPermission": "Izinkan NoteNote mengakses kamera untuk mengambil foto catatan.",
-          "photosPermission": "Izinkan NoteNote mengakses galeri untuk memilih foto."
-        }
-      ],
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
-      ],
-      "expo-web-browser",
-      "expo-font"
-    ],
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF",
-      "dark": {
-        "backgroundColor": "#000000"
-      }
-    },
-    "jsEngine": "hermes",
-    "newArchEnabled": true,
-    "buildCacheProvider": "eas",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.notenotedev.notenote",
-      "buildNumber": "1",
-      "infoPlist": {
-        "UIBackgroundModes": ["fetch", "remote-notification"]
-      }
-    },
-    "android": {
-      "package": "com.notenotedev.notenote",
-      "versionCode": 1,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png",
-        "backgroundColor": "#E6F4FE"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "permissions": []
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png",
-      "bundler": "webpack"
-    },
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
-    "_internal": {
-      "isDebug": false,
-      "projectRoot": "."
-    }
-  }
+	"expo": {
+		"name": "NoteNote",
+		"description": "Aplikasi catatan dan to-do list sederhana dengan Firebase Auth & Firestore. Catat ide, wujudkan mimpi.",
+		"slug": "notenote",
+		"owner": "raiwirawan",
+		"currentFullName": "NoteNote",
+		"originalFullName": "NoteNote",
+		"runtimeVersion": {
+			"policy": "sdkVersion"
+		},
+		"version": "1.0.0",
+		"platforms": ["ios", "android", "web"],
+		"githubUrl": "https://github.com/raiwirawan/uts-pemrograman-mobile",
+		"orientation": "portrait",
+		"userInterfaceStyle": "light",
+		"backgroundColor": "#FFFFFF",
+		"primaryColor": "#6A1B9A",
+		"icon": "./assets/images/icon.png",
+		"notification": {
+			"icon": "./assets/images/favicon.png",
+			"color": "#6A1B9A",
+			"androidMode": "default"
+		},
+		"androidNavigationBar": {
+			"backgroundColor": "#FFFFFF",
+			"barStyle": "dark-content"
+		},
+		"developmentClient": {
+			"silentLaunch": true
+		},
+		"scheme": "notenote",
+		"updates": {
+			"fallbackToCacheTimeout": 0,
+			"enabled": true
+		},
+		"locales": {},
+		"plugins": [
+			"expo-router",
+			[
+				"expo-image-picker",
+				{
+					"cameraPermission": "Izinkan NoteNote mengakses kamera untuk mengambil foto catatan.",
+					"photosPermission": "Izinkan NoteNote mengakses galeri untuk memilih foto."
+				}
+			],
+			[
+				"expo-splash-screen",
+				{
+					"image": "./assets/images/splash-icon.png",
+					"imageWidth": 200,
+					"resizeMode": "contain",
+					"backgroundColor": "#FFFFFF",
+					"dark": {
+						"backgroundColor": "#000000"
+					}
+				}
+			],
+			"expo-web-browser",
+			"expo-font",
+			[
+				"expo-location",
+				{
+					"locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to tag your notes."
+				}
+			],
+			[
+				"expo-notifications",
+				{
+					"icon": "./assets/notification-icon.png",
+					"color": "#8B5CF6",
+					"sounds": ["./assets/notification-sound.wav"]
+				}
+			]
+		],
+		"splash": {
+			"image": "./assets/images/splash-icon.png",
+			"resizeMode": "contain",
+			"backgroundColor": "#FFFFFF",
+			"dark": {
+				"backgroundColor": "#000000"
+			}
+		},
+		"jsEngine": "hermes",
+		"newArchEnabled": true,
+		"buildCacheProvider": "eas",
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "com.notenotedev.notenote",
+			"buildNumber": "1",
+			"infoPlist": {
+				"UIBackgroundModes": ["fetch", "remote-notification"],
+				"NSLocationWhenInUseUsageDescription": "We need your location to tag your notes with where they were created.",
+				"NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to tag your notes with where they were created."
+			}
+		},
+		"android": {
+			"package": "com.notenotedev.notenote",
+			"versionCode": 1,
+			"adaptiveIcon": {
+				"foregroundImage": "./assets/images/android-icon-foreground.png",
+				"backgroundImage": "./assets/images/android-icon-background.png",
+				"monochromeImage": "./assets/images/android-icon-monochrome.png",
+				"backgroundColor": "#E6F4FE"
+			},
+			"edgeToEdgeEnabled": true,
+			"predictiveBackGestureEnabled": false,
+			"permissions": [
+				"ACCESS_COARSE_LOCATION",
+				"ACCESS_FINE_LOCATION",
+				"POST_NOTIFICATIONS",
+				"SCHEDULE_EXACT_ALARM"
+			]
+		},
+		"web": {
+			"output": "static",
+			"favicon": "./assets/images/favicon.png",
+			"bundler": "webpack"
+		},
+		"experiments": {
+			"typedRoutes": true,
+			"reactCompiler": true
+		},
+		"_internal": {
+			"isDebug": false,
+			"projectRoot": "."
+		}
+	}
 }

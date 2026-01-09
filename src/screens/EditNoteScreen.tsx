@@ -1,9 +1,6 @@
-// import { storage } from "@/config/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute } from "@react-navigation/native";
-// import * as ImagePicker from "expo-image-picker";
-// import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
 	ActivityIndicator,
@@ -11,6 +8,7 @@ import {
 	Image,
 	Keyboard,
 	KeyboardAvoidingView,
+	Linking,
 	Platform,
 	ScrollView,
 	StyleSheet,
@@ -23,14 +21,17 @@ import {
 import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
 import { deleteNote, updateNote } from "@/lib/notes";
-
 import {
 	deleteNoteImage,
 	pickImage,
 	takePhoto,
 	uploadNoteImage,
 } from "@/lib/storage";
-
+import {
+	getCurrentLocation,
+	formatLocation,
+	NoteLocation,
+} from "@/lib/location";
 import { EditNoteScreenProps } from "@/types/navigation";
 
 // eslint-disable-next-line no-empty-pattern
@@ -41,7 +42,6 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 
 	const headerHeight = useHeaderHeight();
 
-	// const [permission, requestPermission] = ImagePicker.useCameraPermissions();
 	const note = route.params?.note;
 
 	// === STATE DATA ===
@@ -50,35 +50,41 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 	const [imageUri, setImageUri] = useState<string | null>(
 		note?.imageUrl ?? null
 	);
+	const [location, setLocation] = useState<NoteLocation | null>(
+		note?.location ?? null
+	);
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(
 		note?.imageUrl ?? null
+	);
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const [originalLocation, setOriginalLocation] = useState<NoteLocation | null>(
+		note?.location ?? null
 	);
 
 	const [saving, setSaving] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [uploading, setUploading] = useState(false);
+	const [loadingLocation, setLoadingLocation] = useState(false);
 	const [hasChanges, setHasChanges] = useState(false);
 
 	const [isEditing, setIsEditing] = useState(false);
-
-	// State untuk melacak apakah keyboard terlihat atau tidak
 	const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
 	const scrollViewRef = useRef<ScrollView>(null);
 
-	// === DETEKSI KEYBOARD (LOGIKA BARU) ===
+	// === DETEKSI KEYBOARD ===
 	useEffect(() => {
 		const keyboardDidShowListener = Keyboard.addListener(
 			"keyboardDidShow",
 			() => {
-				setKeyboardVisible(true); // Keyboard Muncul -> Aktifkan Padding Besar
+				setKeyboardVisible(true);
 			}
 		);
 		const keyboardDidHideListener = Keyboard.addListener(
 			"keyboardDidHide",
 			() => {
-				setKeyboardVisible(false); // Keyboard Hilang -> Matikan Padding
+				setKeyboardVisible(false);
 			}
 		);
 
@@ -173,6 +179,22 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 		}
 	};
 
+	// === GET LOCATION ===
+	const handleGetLocation = async () => {
+		try {
+			setLoadingLocation(true);
+			const loc = await getCurrentLocation();
+			if (loc) {
+				setLocation(loc);
+				setHasChanges(true);
+			}
+		} catch (error: any) {
+			Alert.alert("Error", error.message);
+		} finally {
+			setLoadingLocation(false);
+		}
+	};
+
 	// === REMOVE IMAGE ===
 	const handleRemoveImage = () => {
 		Alert.alert("Hapus Gambar", "Yakin ingin menghapus gambar ini?", [
@@ -186,6 +208,29 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 				},
 			},
 		]);
+	};
+
+	// === REMOVE LOCATION ===
+	const handleRemoveLocation = () => {
+		Alert.alert("Hapus Lokasi", "Yakin ingin menghapus lokasi ini?", [
+			{ text: "Batal", style: "cancel" },
+			{
+				text: "Hapus",
+				style: "destructive",
+				onPress: () => {
+					setLocation(null);
+					setHasChanges(true);
+				},
+			},
+		]);
+	};
+
+	// === OPEN IN MAPS ===
+	const handleOpenInMaps = () => {
+		if (location) {
+			const url = `https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`;
+			Linking.openURL(url);
+		}
 	};
 
 	// === SHOW IMAGE OPTIONS ===
@@ -207,7 +252,6 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 	};
 
 	// === SAVE NOTE ===
-
 	const handleSave = async () => {
 		if (!title.trim() || !content.trim()) {
 			Alert.alert("Error", "Judul & isi wajib diisi");
@@ -253,6 +297,7 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 											title: title.trim(),
 											content: content.trim(),
 											imageUrl: null,
+											location: location,
 										});
 										setHasChanges(false);
 										navigation.goBack();
@@ -270,6 +315,7 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 				title: title.trim(),
 				content: content.trim(),
 				imageUrl: uploadedImageUrl,
+				location: location,
 			});
 
 			setHasChanges(false);
@@ -325,7 +371,6 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 					style={styles.scrollView}
 					contentContainerStyle={[
 						styles.scrollContent,
-						// DINAMIS: Jika keyboard ada, padding=400. Jika tidak, padding=20 (standar)
 						{ paddingBottom: isKeyboardVisible ? 400 : 20 },
 					]}
 					keyboardShouldPersistTaps="handled"
@@ -351,36 +396,110 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 					)}
 
 					{/* GAMBAR SECTION */}
-					<Text style={styles.label}>Gambar (Opsional)</Text>
+					{isEditing && <Text style={styles.label}>Gambar (Opsional)</Text>}
 					{imageUri ? (
 						<View style={styles.imageContainer}>
 							<Image source={{ uri: imageUri }} style={styles.imagePreview} />
-							<TouchableOpacity
-								style={styles.removeImageBtn}
-								onPress={handleRemoveImage}
-							>
-								<Ionicons name="close-circle" size={32} color={colors.DANGER} />
-							</TouchableOpacity>
+							{isEditing && (
+								<TouchableOpacity
+									style={styles.removeImageBtn}
+									onPress={handleRemoveImage}
+								>
+									<Ionicons
+										name="close-circle"
+										size={32}
+										color={colors.DANGER}
+									/>
+								</TouchableOpacity>
+							)}
 						</View>
 					) : (
+						isEditing && (
+							<TouchableOpacity
+								style={styles.addImageBtn}
+								onPress={showImageOptions}
+								disabled={uploading}
+							>
+								{uploading ? (
+									<ActivityIndicator color={colors.PRIMARY_PURPLE} />
+								) : (
+									<>
+										<Ionicons
+											name="image-outline"
+											size={32}
+											color={colors.PRIMARY_PURPLE}
+										/>
+										<Text style={styles.addImageText}>Tambah Gambar</Text>
+									</>
+								)}
+							</TouchableOpacity>
+						)
+					)}
+
+					{/* LOKASI SECTION */}
+					{isEditing && <Text style={styles.label}>Lokasi (Opsional)</Text>}
+					{location ? (
 						<TouchableOpacity
-							style={styles.addImageBtn}
-							onPress={showImageOptions}
-							disabled={uploading}
+							style={styles.locationContainer}
+							onPress={!isEditing ? handleOpenInMaps : undefined}
+							activeOpacity={!isEditing ? 0.7 : 1}
 						>
-							{uploading ? (
-								<ActivityIndicator color={colors.PRIMARY_PURPLE} />
-							) : (
-								<>
+							<View style={styles.locationContent}>
+								<Ionicons
+									name="location"
+									size={24}
+									color={colors.PRIMARY_PURPLE}
+								/>
+								<View style={styles.locationTextContainer}>
+									<Text style={styles.locationText} numberOfLines={2}>
+										{formatLocation(location)}
+									</Text>
+									<Text style={styles.locationCoords}>
+										{location.latitude.toFixed(6)},{" "}
+										{location.longitude.toFixed(6)}
+									</Text>
+								</View>
+							</View>
+							{isEditing ? (
+								<TouchableOpacity
+									style={styles.removeLocationBtn}
+									onPress={handleRemoveLocation}
+								>
 									<Ionicons
-										name="image-outline"
-										size={32}
-										color={colors.PRIMARY_PURPLE}
+										name="close-circle"
+										size={28}
+										color={colors.DANGER}
 									/>
-									<Text style={styles.addImageText}>Tambah Gambar</Text>
-								</>
+								</TouchableOpacity>
+							) : (
+								<Ionicons
+									name="chevron-forward"
+									size={20}
+									color={colors.TEXT_GREY}
+								/>
 							)}
 						</TouchableOpacity>
+					) : (
+						isEditing && (
+							<TouchableOpacity
+								style={styles.addLocationBtn}
+								onPress={handleGetLocation}
+								disabled={loadingLocation}
+							>
+								{loadingLocation ? (
+									<ActivityIndicator color={colors.PRIMARY_PURPLE} />
+								) : (
+									<>
+										<Ionicons
+											name="location-outline"
+											size={32}
+											color={colors.PRIMARY_PURPLE}
+										/>
+										<Text style={styles.addLocationText}>Tambah Lokasi</Text>
+									</>
+								)}
+							</TouchableOpacity>
+						)
 					)}
 
 					{/* === ISI KONTEN === */}
@@ -421,7 +540,7 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 						<View style={styles.buttonRow}>
 							<TouchableOpacity
 								style={styles.iconBtn}
-								onPress={takePhoto}
+								onPress={handleTakePhoto}
 								disabled={saving || deleting}
 							>
 								<Ionicons
@@ -432,11 +551,22 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 							</TouchableOpacity>
 							<TouchableOpacity
 								style={styles.iconBtn}
-								onPress={pickImage}
+								onPress={handlePickImage}
 								disabled={saving || deleting}
 							>
 								<Ionicons
 									name="image-outline"
+									size={24}
+									color={colors.PRIMARY_PURPLE}
+								/>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.iconBtn}
+								onPress={handleGetLocation}
+								disabled={saving || deleting || loadingLocation}
+							>
+								<Ionicons
+									name="location-outline"
 									size={24}
 									color={colors.PRIMARY_PURPLE}
 								/>
@@ -476,13 +606,8 @@ export default function EditNoteScreen({}: EditNoteScreenProps) {
 
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: colors.WHITE },
-
 	scrollView: { flex: 1 },
-	scrollContent: {
-		padding: 20,
-		// paddingBottom disini sekarang diatur secara dinamis di inline style komponen ScrollView
-	},
-
+	scrollContent: { padding: 20 },
 	centerContent: {
 		flex: 1,
 		justifyContent: "center",
@@ -495,8 +620,6 @@ const styles = StyleSheet.create({
 		color: colors.TEXT_GREY,
 		marginBottom: 8,
 	},
-
-	// INPUT STYLES
 	titleInput: {
 		fontSize: 20,
 		fontWeight: "bold",
@@ -544,6 +667,58 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: "600",
 	},
+	// Location styles
+	locationContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		padding: 12,
+		borderWidth: 1,
+		borderColor: colors.PRIMARY_PURPLE,
+		borderRadius: 12,
+		marginBottom: 20,
+		backgroundColor: colors.CARD_BG,
+	},
+	locationContent: {
+		flexDirection: "row",
+		alignItems: "center",
+		flex: 1,
+		marginRight: 8,
+	},
+	locationTextContainer: {
+		marginLeft: 10,
+		flex: 1,
+	},
+	locationText: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: colors.TEXT_DARK,
+		marginBottom: 2,
+	},
+	locationCoords: {
+		fontSize: 11,
+		color: colors.TEXT_GREY,
+	},
+	removeLocationBtn: {
+		padding: 4,
+	},
+	addLocationBtn: {
+		height: 100,
+		borderWidth: 2,
+		borderStyle: "dashed",
+		borderColor: colors.PRIMARY_PURPLE,
+		borderRadius: 12,
+		justifyContent: "center",
+		alignItems: "center",
+		marginBottom: 20,
+		backgroundColor: colors.CARD_BG,
+		gap: 8,
+	},
+	addLocationText: {
+		color: colors.PRIMARY_PURPLE,
+		fontSize: 16,
+		fontWeight: "600",
+	},
 	contentInput: {
 		fontSize: 16,
 		padding: 16,
@@ -555,8 +730,6 @@ const styles = StyleSheet.create({
 		lineHeight: 24,
 		textAlignVertical: "top",
 	},
-
-	// VIEW STYLES
 	viewTitle: {
 		fontSize: 26,
 		fontFamily: "Poppins-Bold",
@@ -569,26 +742,6 @@ const styles = StyleSheet.create({
 		color: colors.TEXT_DARK,
 		lineHeight: 26,
 	},
-
-	// IMAGE STYLES
-	// imageContainer: { marginBottom: 20, position: "relative" },
-	previewImage: {
-		width: "100%",
-		height: 250,
-		borderRadius: 12,
-		resizeMode: "cover",
-		borderWidth: 1,
-		borderColor: colors.DIVIDER,
-	},
-	// removeImageBtn: {
-	// 	position: "absolute",
-	// 	top: -10,
-	// 	right: -10,
-	// 	backgroundColor: colors.WHITE,
-	// 	borderRadius: 15,
-	// },
-
-	// FOOTER STYLES
 	footer: {
 		paddingHorizontal: 20,
 		paddingVertical: 12,
@@ -596,7 +749,7 @@ const styles = StyleSheet.create({
 		borderTopWidth: 1,
 		borderTopColor: colors.DIVIDER,
 	},
-	buttonRow: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
+	buttonRow: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
 	iconBtn: {
 		flex: 0.5,
 		alignItems: "center",

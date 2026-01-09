@@ -16,13 +16,15 @@ import {
 } from "firebase/firestore";
 
 import { deleteNoteImage } from "./storage";
+import { NoteLocation } from "./location";
 
 export type Note = {
 	isFavorite: boolean;
 	id: string;
 	title: string;
 	content: string;
-	imageUrl?: string; // ← TAMBAH INI untuk menyimpan URL gambar
+	imageUrl?: string;
+	location?: NoteLocation; // ← TAMBAH LOCATION
 	userId: string;
 	createdAt: any;
 	updatedAt: any;
@@ -35,7 +37,8 @@ export const createNote = async (
 	userId: string,
 	title: string,
 	content: string,
-	imageUrl?: string // ← TAMBAH PARAMETER
+	imageUrl?: string,
+	location?: NoteLocation // ← TAMBAH PARAMETER
 ): Promise<string> => {
 	if (!userId) throw new Error("userId diperlukan");
 
@@ -43,7 +46,8 @@ export const createNote = async (
 		title: title.trim(),
 		content: content.trim(),
 		userId,
-		imageUrl: imageUrl || null, // ← SIMPAN NULL JIKA TIDAK ADA GAMBAR
+		imageUrl: imageUrl || null,
+		location: location || null, // ← SIMPAN LOCATION
 		isFavorite: false,
 		createdAt: serverTimestamp(),
 		updatedAt: serverTimestamp(),
@@ -80,7 +84,12 @@ export const getUserNotes = async (userId: string): Promise<Note[]> => {
 export const updateNote = async (
 	userId: string,
 	noteId: string,
-	updates: { title?: string; content?: string; imageUrl?: string | null } // ← TAMBAH imageUrl
+	updates: {
+		title?: string;
+		content?: string;
+		imageUrl?: string | null;
+		location?: NoteLocation | null; // ← TAMBAH LOCATION
+	}
 ): Promise<void> => {
 	if (!userId) throw new Error("userId diperlukan");
 
@@ -129,7 +138,7 @@ export const deleteNote = async (
 	await deleteDoc(docRef);
 };
 
-// === DELETE MULTIPLE (BATCH) - INI YANG ANDA BUTUHKAN ===
+// === DELETE MULTIPLE (BATCH) ===
 export const deleteMultipleNotes = async (
 	userId: string,
 	noteIds: string[]
@@ -137,7 +146,6 @@ export const deleteMultipleNotes = async (
 	if (!userId) throw new Error("userId diperlukan");
 	if (noteIds.length === 0) return;
 
-	// Menggunakan Batch untuk menghapus banyak sekaligus
 	const batch = writeBatch(db);
 
 	noteIds.forEach((id) => {
@@ -145,7 +153,6 @@ export const deleteMultipleNotes = async (
 		batch.delete(docRef);
 	});
 
-	// Jalankan semua perintah hapus
 	await batch.commit();
 };
 
@@ -155,6 +162,7 @@ export interface NoteData {
 	content: string;
 	userId: string;
 	imageUrl?: string | null;
+	location?: NoteLocation | null; // ← TAMBAH LOCATION
 	isFavorite?: boolean;
 }
 
@@ -163,6 +171,7 @@ export const addNote = async (data: NoteData) => {
 		await addDoc(collection(db, "notes"), {
 			...data,
 			imageUrl: data.imageUrl || null,
+			location: data.location || null, // ← TAMBAH LOCATION
 			isFavorite: data.isFavorite || false,
 			createdAt: serverTimestamp(),
 			updatedAt: serverTimestamp(),

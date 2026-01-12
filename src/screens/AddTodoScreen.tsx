@@ -70,6 +70,8 @@ export default function AddTodoScreen({}: AddTodoScreenProps) {
 		setSaving(true);
 		try {
 			// Deskripsi diizinkan kosong
+
+			// @ts-ignore
 			await createTodo(user.uid, title.trim(), description.trim());
 			setHasChanges(false);
 			navigation.goBack();

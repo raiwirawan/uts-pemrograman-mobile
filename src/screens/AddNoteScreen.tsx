@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-// import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import {
 	ActivityIndicator,
@@ -20,6 +19,11 @@ import colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
 import { createNote } from "@/lib/notes";
 import { pickImage, takePhoto, uploadNoteImage } from "@/lib/storage";
+import {
+	getCurrentLocation,
+	formatLocation,
+	NoteLocation,
+} from "@/lib/location";
 import { AddNoteScreenProps } from "@/types/navigation";
 
 // eslint-disable-next-line no-empty-pattern
@@ -27,14 +31,13 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 	const { user } = useAuth();
 	const navigation = useNavigation<AddNoteScreenProps["navigation"]>();
 
-	// Hook Izin Kamera
-	// const [permission, requestPermission] = ImagePicker.useCameraPermissions();
-
 	const [title, setTitle] = useState("");
 	const [content, setContent] = useState("");
 	const [imageUri, setImageUri] = useState<string | null>(null);
+	const [location, setLocation] = useState<NoteLocation | null>(null);
 	const [uploading, setUploading] = useState(false);
 	const [saving, setSaving] = useState(false);
+	const [loadingLocation, setLoadingLocation] = useState(false);
 	const [hasChanges, setHasChanges] = useState(false);
 
 	// === BACK HANDLER ===
@@ -74,7 +77,7 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 		}
 	};
 
-	// === FUNGSI BARU: AMBIL DARI KAMERA ===
+	// === FUNGSI: AMBIL DARI KAMERA ===
 	const handleTakePhoto = async () => {
 		try {
 			setUploading(true);
@@ -90,6 +93,22 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 		}
 	};
 
+	// === FUNGSI: AMBIL LOKASI ===
+	const handleGetLocation = async () => {
+		try {
+			setLoadingLocation(true);
+			const loc = await getCurrentLocation();
+			if (loc) {
+				setLocation(loc);
+				setHasChanges(true);
+			}
+		} catch (error: any) {
+			Alert.alert("Error", error.message);
+		} finally {
+			setLoadingLocation(false);
+		}
+	};
+
 	const handleRemoveImage = () => {
 		Alert.alert("Hapus Gambar", "Yakin ingin menghapus gambar ini?", [
 			{ text: "Batal", style: "cancel" },
@@ -98,6 +117,20 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 				style: "destructive",
 				onPress: () => {
 					setImageUri(null);
+					setHasChanges(true);
+				},
+			},
+		]);
+	};
+
+	const handleRemoveLocation = () => {
+		Alert.alert("Hapus Lokasi", "Yakin ingin menghapus lokasi ini?", [
+			{ text: "Batal", style: "cancel" },
+			{
+				text: "Hapus",
+				style: "destructive",
+				onPress: () => {
+					setLocation(null);
 					setHasChanges(true);
 				},
 			},
@@ -140,7 +173,6 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 			// Upload image if exists
 			if (imageUri) {
 				try {
-					// Create temporary noteId for upload
 					const tempNoteId = `temp_${Date.now()}`;
 					uploadedImageUrl = await uploadNoteImage(
 						user.uid,
@@ -156,7 +188,13 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 							{
 								text: "Lanjutkan",
 								onPress: async () => {
-									await createNote(user.uid, title.trim(), content.trim());
+									await createNote(
+										user.uid,
+										title.trim(),
+										content.trim(),
+										undefined,
+										location || undefined
+									);
 									setHasChanges(false);
 									navigation.goBack();
 								},
@@ -168,12 +206,13 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 				}
 			}
 
-			// Create note with image URL
+			// Create note with image URL and location
 			await createNote(
 				user.uid,
 				title.trim(),
 				content.trim(),
-				uploadedImageUrl
+				uploadedImageUrl,
+				location || undefined
 			);
 			setHasChanges(false);
 			navigation.goBack();
@@ -241,6 +280,54 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 					</TouchableOpacity>
 				)}
 
+				{/* LOKASI SECTION */}
+				<Text style={styles.label}>Lokasi (Opsional)</Text>
+				{location ? (
+					<View style={styles.locationContainer}>
+						<View style={styles.locationContent}>
+							<Ionicons
+								name="location"
+								size={24}
+								color={colors.PRIMARY_PURPLE}
+							/>
+							<View style={styles.locationTextContainer}>
+								<Text style={styles.locationText} numberOfLines={2}>
+									{formatLocation(location)}
+								</Text>
+								<Text style={styles.locationCoords}>
+									{location.latitude.toFixed(6)},{" "}
+									{location.longitude.toFixed(6)}
+								</Text>
+							</View>
+						</View>
+						<TouchableOpacity
+							style={styles.removeLocationBtn}
+							onPress={handleRemoveLocation}
+						>
+							<Ionicons name="close-circle" size={28} color={colors.DANGER} />
+						</TouchableOpacity>
+					</View>
+				) : (
+					<TouchableOpacity
+						style={styles.addLocationBtn}
+						onPress={handleGetLocation}
+						disabled={loadingLocation}
+					>
+						{loadingLocation ? (
+							<ActivityIndicator color={colors.PRIMARY_PURPLE} />
+						) : (
+							<>
+								<Ionicons
+									name="location-outline"
+									size={32}
+									color={colors.PRIMARY_PURPLE}
+								/>
+								<Text style={styles.addLocationText}>Tambah Lokasi</Text>
+							</>
+						)}
+					</TouchableOpacity>
+				)}
+
 				<Text style={styles.label}>Isi Catatan</Text>
 				<TextInput
 					style={styles.contentInput}
@@ -262,7 +349,7 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 					{/* TOMBOL 1: KAMERA */}
 					<TouchableOpacity
 						style={styles.iconBtn}
-						onPress={takePhoto}
+						onPress={handleTakePhoto}
 						disabled={saving}
 					>
 						<Ionicons
@@ -275,7 +362,7 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 					{/* TOMBOL 2: GALERI */}
 					<TouchableOpacity
 						style={styles.iconBtn}
-						onPress={pickImage}
+						onPress={handlePickImage}
 						disabled={saving}
 					>
 						<Ionicons
@@ -285,7 +372,20 @@ export default function AddNoteScreen({}: AddNoteScreenProps) {
 						/>
 					</TouchableOpacity>
 
-					{/* TOMBOL 3: SIMPAN */}
+					{/* TOMBOL 3: LOKASI */}
+					<TouchableOpacity
+						style={styles.iconBtn}
+						onPress={handleGetLocation}
+						disabled={saving || loadingLocation}
+					>
+						<Ionicons
+							name="location-outline"
+							size={24}
+							color={colors.PRIMARY_PURPLE}
+						/>
+					</TouchableOpacity>
+
+					{/* TOMBOL 4: SIMPAN */}
 					<TouchableOpacity
 						style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
 						onPress={handleSave}
@@ -364,6 +464,58 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: "600",
 	},
+	// Location styles
+	locationContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		padding: 12,
+		borderWidth: 1,
+		borderColor: colors.PRIMARY_PURPLE,
+		borderRadius: 12,
+		marginBottom: 20,
+		backgroundColor: colors.CARD_BG,
+	},
+	locationContent: {
+		flexDirection: "row",
+		alignItems: "center",
+		flex: 1,
+		marginRight: 8,
+	},
+	locationTextContainer: {
+		marginLeft: 10,
+		flex: 1,
+	},
+	locationText: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: colors.TEXT_DARK,
+		marginBottom: 2,
+	},
+	locationCoords: {
+		fontSize: 11,
+		color: colors.TEXT_GREY,
+	},
+	removeLocationBtn: {
+		padding: 4,
+	},
+	addLocationBtn: {
+		height: 100,
+		borderWidth: 2,
+		borderStyle: "dashed",
+		borderColor: colors.PRIMARY_PURPLE,
+		borderRadius: 12,
+		justifyContent: "center",
+		alignItems: "center",
+		marginBottom: 20,
+		backgroundColor: colors.CARD_BG,
+		gap: 8,
+	},
+	addLocationText: {
+		color: colors.PRIMARY_PURPLE,
+		fontSize: 16,
+		fontWeight: "600",
+	},
 	contentInput: {
 		fontSize: 16,
 		padding: 16,
@@ -386,9 +538,7 @@ const styles = StyleSheet.create({
 		shadowOpacity: 0.1,
 		shadowRadius: 4,
 	},
-	buttonRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-
-	// Update Style Tombol Icon (Kotak Kecil)
+	buttonRow: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
 	iconBtn: {
 		flex: 0.5,
 		alignItems: "center",
@@ -399,7 +549,6 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: colors.DIVIDER,
 	},
-
 	saveBtn: {
 		flex: 2,
 		flexDirection: "row",

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
+	ActivityIndicator,
 	Alert,
 	KeyboardAvoidingView,
 	Platform,
@@ -10,12 +11,13 @@ import {
 	TextInput,
 	TouchableOpacity,
 	View,
-	ActivityIndicator,
 } from "react-native";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginScreenProps } from "@/types/navigation";
+
+import { commonStyles } from "@/styles/commonStyles";
 
 function LoginScreen({ navigation }: LoginScreenProps) {
 	const [email, setEmail] = useState("");
@@ -58,15 +60,15 @@ function LoginScreen({ navigation }: LoginScreenProps) {
 	return (
 		<KeyboardAvoidingView
 			behavior={Platform.OS === "ios" ? "padding" : "height"}
-			style={styles.container}
+			style={commonStyles.container}
 		>
 			<ScrollView
-				contentContainerStyle={styles.scrollContent}
+				contentContainerStyle={commonStyles.scrollContent}
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
 			>
-				<Text style={styles.title}>{"Let's Login"}</Text>
-				<Text style={styles.subtitle}>And notes your idea</Text>
+				<Text style={commonStyles.title}>{"Let's Login"}</Text>
+				<Text style={commonStyles.subtitle}>And notes your idea</Text>
 
 				<Text style={styles.label}>Email Address</Text>
 				<TextInput
